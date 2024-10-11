@@ -75,7 +75,7 @@ task_docker_push() {
         return 1
     fi
     if [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_PASSWORD" ]]; then
-        docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_PASSWORD"
+        docker login --username "$DOCKERHUB_USERNAME" --password-stdin <<<"$DOCKERHUB_PASSWORD"
     fi
     docker tag "$repository:$tag" "$repository:latest"
     docker push "$repository:$tag"
