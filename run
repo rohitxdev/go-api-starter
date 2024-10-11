@@ -21,11 +21,22 @@ prompt() {
     [[ "$res" =~ ^[Yy]$ ]]
 }
 
-print_color() {
-    local text="$2"
-    local -A colors=(["grey"]="30" ["red"]="31" ["green"]="32" ["yellow"]="33" ["blue"]="34" ["magenta"]="35" ["cyan"]="36" ["white"]="37")
+print() {
+    declare -A colors=(["debug"]="30" ["loading"]="36" ["info"]="37" ["success"]="32" ["warn"]="33" ["error"]="31")
+    local prefix
+    case "$1" in
+    "debug") prefix="• " ;;
+    "loading") prefix="⧗ " ;;
+    "info") prefix="➤ " ;;
+    "success") prefix="✔ " ;;
+    "warn") prefix="⚠ " ;;
+    "error") prefix="✗ " ;;
+    *) prefix="" ;;
+    esac
+
+    local text="$prefix$2"
     if tput colors &>/dev/null; then
-        printf "\x1b[%sm%s\x1b[0m\n" "${colors[$1]:-0}" "$text"
+        printf "\x1b[%sm%s\x1b[0m\n" "${colors[$1]:-white}" "$text"
     else
         printf "%s\n" "$text"
     fi
@@ -41,11 +52,11 @@ print_menu() {
 
     mapfile -t tasks < <(printf "%s\n" "${tasks[@]}" | sort)
 
-    print_color magenta "Available tasks"
+    echo "Available tasks"
     for task in "${tasks[@]}"; do
         echo "➤ $task"
     done
-    print_color cyan "Usage: $0 <task>"
+    echo "Usage: $0 <task>"
 }
 
 # Run live development server in docker
@@ -65,13 +76,13 @@ task_docker_build() {
         docker rmi "$repository:$tag" --force
     fi
     docker build --tag "$repository:$tag" --target production --platform linux/amd64 --build-arg BASE_IMAGE_TAG="$BASE_IMAGE_TAG" .
-    echo -e "\n➤ Image: $repository:$tag"
+    print info "Image: $repository:$tag"
 }
 
 # Push production docker image to registry
 task_docker_push() {
     if echo "$tag" | grep "dirty"; then
-        print_color red "Image tag is dirty. Please commit the changes and re-build the image. Quitting..."
+        print error "image tag is dirty. Please commit the changes and re-build the image."
         return 1
     fi
     if [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_PASSWORD" ]]; then
@@ -80,7 +91,8 @@ task_docker_push() {
     docker tag "$repository:$tag" "$repository:latest"
     docker push "$repository:$tag"
     docker push "$repository:latest"
-    echo -e "\nThe following images were pushed to registry:
+    echo
+    print info "The following images were pushed to registry:
     - $repository:$tag
     - $repository:latest"
 }
@@ -91,7 +103,7 @@ task_watch() {
     local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/internal/config.BuildId=$APP_NAME.$APP_VERSION-dev\" --race -o $tmp_dir/main  ."
 
     if ! command -v air &>/dev/null; then
-        print_color cyan "Installing air..."
+        print loading "installing air..."
         go install github.com/air-verse/air@latest
     fi
     # build.kill_delay is in nanoseconds
@@ -106,34 +118,34 @@ task_build() {
     local build_cmd="CGO_ENABLED=0 go build \
         -ldflags='-s -w -X $PACKAGE_NAME/internal/config.BuildId=$build_id -extldflags \"-static\"' \
         --trimpath -o $build_path ."
-
-    print_color cyan "Building app..."
+    print loading "building app..."
 
     if go generate ./...; then
-        print_color green "OpenAPI docs generated ✔"
+        print success "openapi docs generated"
     else
-        print_color red "Failed to generate OpenAPI docs"
+        print error "failed to generate openapi docs"
         return 1
     fi
 
     if ! eval "$build_cmd"; then
-        print_color red "Build failed"
+        print error "build failed"
         return 1
     fi
 
     if file "$build_path" | grep "dynamically linked" >/dev/null; then
-        print_color red "Fatal: Binary is still dynamically linked."
+        print error "fatal: binary is still dynamically linked."
         file "$build_path"
         return 1
     fi
 
-    print_color green "Build successful ✔ $(print_color grey "($build_id)")"
+    print success "build successful"
+    print debug "build id: $build_id"
 }
 
 # Run go app build
 task_start() {
     if [[ ! -x "$build_path" ]]; then
-        print_color red "Build not found."
+        print error "build not found."
         return 1
     fi
     "$build_path"
@@ -159,44 +171,44 @@ task_clean() {
     go mod tidy -v
     go clean --cache
     rm -rf ./bin ./.tmp
-    print_color green "Cleaned up successfully ✔"
+    print success "cleaned up successfully"
 }
 
 # Generate pprof profile
 task_pprof() {
-    curl "http://localhost:${PORT:-"8080"}/debug/pprof/profile?seconds=30" >default.pgo && print_color green "Pprof profile generated successfully ✔"
+    curl "http://localhost:${PORT:-"8080"}/debug/pprof/profile?seconds=30" >default.pgo && print success "pprof profile generated successfully"
 }
 
 # Create a git checkpoint and push to origin
 task_checkpoint() {
     if ! prompt "Create git checkpoint and push changes to origin?"; then
-        print_color cyan "Quitting..."
+        print info "quitting..."
         return 1
     fi
     if ! task_build && ! prompt "Still continue?"; then
-        print_color cyan "Quitting..."
+        print info "quitting..."
         return 1
     fi
     if git add . && git commit -m "Checkpoint at $(date -u)" && git push; then
-        print_color green "Checkpoint created successfully ✔"
+        print success "Checkpoint created successfully ✔"
         return 0
     fi
-    print_color red "Failed to create checkpoint"
+    print error "Failed to create checkpoint"
 }
 
 # Upgrade dependencies
 task_upgrade_deps() {
     if go get -u ./...; then
-        print_color green "Upgraded minor/patch versions of packages successfully ✔"
-        echo "To upgrade major versions, you have to run 'go get -u <package>@<version>' for each package manually"
+        print success "✔ Upgraded minor/patch versions of packages successfully"
+        print info "To upgrade major versions, you have to run 'go get -u <package>@<version>' for each package manually"
         return 0
     fi
-    print_color red "Failed to upgrade packages"
+    print error "failed to upgrade packages"
 }
 
 if [[ -z "$(declare -F "task_$1")" ]]; then
     print_menu
 else
-    echo "➤ Executing task: $*"
+    print info "Executing task: $*"
     "task_$*"
 fi
