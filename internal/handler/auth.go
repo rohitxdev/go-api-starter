@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	sessionMaxAge = 86400 * 7 // 7 days
+	sessionMaxAge = 86400 * 30 // 30 days
 )
 
 var (
