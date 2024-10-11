@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -14,49 +13,12 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-func TestNew(t *testing.T) {
-	type args struct {
-		db *sql.DB
-	}
-	tests := []struct {
-		name string
-		args args
-		want *repo.Repo
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := repo.New(tt.args.db); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("New() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestRepo_Migrate(t *testing.T) {
-	tests := []struct {
-		repo    *repo.Repo
-		name    string
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.repo.Migrate(); (err != nil) != tt.wantErr {
-				t.Errorf("Repo.Migrate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
 func TestRepo(t *testing.T) {
 	ctx := context.Background()
 
 	// Set up the PostgreSQL container
 	req := testcontainers.ContainerRequest{
-		Image:        "postgres:15-alpine",
+		Image:        "postgres:17-alpine",
 		ExposedPorts: []string{"5432/tcp"},
 		Env: map[string]string{
 			"POSTGRES_USER":     "testuser",
@@ -73,7 +35,7 @@ func TestRepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer postgresC.Terminate(ctx)
+	defer postgresC.Terminate(ctx) // nolint:errcheck
 
 	// Get the container host and port
 	host, err := postgresC.Host(ctx)
@@ -93,8 +55,7 @@ func TestRepo(t *testing.T) {
 	assert.Nil(t, err)
 	defer db.Close()
 
-	r := repo.New(db)
-	err = r.Migrate()
+	r, err := repo.New(db)
 	assert.Nil(t, err)
 
 	t.Run("Create user", func(t *testing.T) {

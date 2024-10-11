@@ -5,9 +5,7 @@ FROM golang${BASE_IMAGE_TAG} AS development
 
 WORKDIR /app
 
-RUN apk add --no-cache build-base bash git
-
-RUN go install github.com/air-verse/air@latest
+RUN apk add --no-cache build-base bash git && go install github.com/air-verse/air@latest
 
 RUN --mount=type=bind,source=go.sum,target=go.sum \
     --mount=type=bind,source=go.mod,target=go.mod \

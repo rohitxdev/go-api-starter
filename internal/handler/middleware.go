@@ -11,13 +11,11 @@ type role uint8
 
 const (
 	RoleUser role = iota + 1
-	RoleStaff
 	RoleAdmin
 )
 
 var roleMap = map[string]role{
 	"user":  RoleUser,
-	"staff": RoleStaff,
 	"admin": RoleAdmin,
 }
 

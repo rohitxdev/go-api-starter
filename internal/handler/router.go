@@ -238,7 +238,7 @@ func New(h *handler) (*echo.Echo, error) {
 
 	e.GET("/ping", h.Ping)
 
-	e.GET("/_", h.AdminRoute, h.protected(RoleAdmin))
+	e.GET("/_", h.Admin, h.protected(RoleAdmin))
 
 	e.GET("/config", h.GetConfig)
 

@@ -59,7 +59,7 @@ func main() {
 
 	slog.SetDefault(slog.New(logHandler))
 
-	slog.Debug(fmt.Sprintf("Running %s on %s in %s environment", config.BuildId, runtime.GOOS+"/"+runtime.GOARCH, c.AppEnv))
+	slog.Debug(fmt.Sprintf("running %s on %s in %s environment", config.BuildId, runtime.GOOS+"/"+runtime.GOARCH, c.AppEnv))
 
 	// Set maxprocs logger
 	maxprocsLogger := maxprocs.Logger(func(s string, i ...interface{}) {
@@ -79,9 +79,9 @@ func main() {
 		if err = db.Close(); err != nil {
 			panic("close database: " + err.Error())
 		}
-		slog.Debug("Database connection closed")
+		slog.Debug("database connection closed")
 	}()
-	slog.Debug("Connected to database")
+	slog.Debug("connected to database")
 
 	//Connect to sqlite database
 	sqliteDb, err := database.NewSqlite(":memory:")
@@ -96,12 +96,15 @@ func main() {
 	}
 	defer func() {
 		kv.Close()
-		slog.Debug("KV store closed")
+		slog.Debug("kv store closed")
 	}()
-	slog.Debug("Connected to kv store")
+	slog.Debug("connected to kv store")
 
 	//Create API handler
-	r := repo.New(db)
+	r, err := repo.New(db)
+	if err != nil {
+		panic("create repo: " + err.Error())
+	}
 	defer r.Close()
 
 	s3Client, err := blobstore.New(c.S3Endpoint, c.S3DefaultRegion, c.AwsAccessKeyId, c.AwsAccessKeySecret)
@@ -134,9 +137,9 @@ func main() {
 		if err = ls.Close(); err != nil {
 			panic("close tcp listener: " + err.Error())
 		}
-		slog.Debug("TCP listener closed")
+		slog.Debug("tcp listener closed")
 	}()
-	slog.Debug("TCP listener created")
+	slog.Debug("tcp listener created")
 
 	go func() {
 		if err := http.Serve(ls, e); err != nil && !errors.Is(err, net.ErrClosed) {
@@ -144,8 +147,8 @@ func main() {
 		}
 	}()
 
-	slog.Debug("HTTP server started")
-	slog.Info(fmt.Sprintf("Server is listening to http://%s and is ready to serve requests", ls.Addr()))
+	slog.Debug("http server started")
+	slog.Info(fmt.Sprintf("server is listening to http://%s and is ready to serve requests", ls.Addr()))
 
 	//Shut down http server gracefully
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -160,5 +163,5 @@ func main() {
 		panic("http server shutdown: " + err.Error())
 	}
 
-	slog.Debug("Shut down http server gracefully")
+	slog.Debug("http server shut down gracefully")
 }

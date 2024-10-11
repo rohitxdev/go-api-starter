@@ -17,6 +17,6 @@ func TestSqlite(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		os.RemoveAll(dbName)
+		os.RemoveAll("db")
 	})
 }

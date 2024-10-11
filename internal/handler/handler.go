@@ -152,7 +152,7 @@ func (h *handler) Ping(c echo.Context) error {
 // @Router /_ [get]
 // @Success 200 {string} string "Hello, Admin!"
 // @Failure 401 {string} string "invalid session"
-func (h *handler) AdminRoute(c echo.Context) error {
+func (h *handler) Admin(c echo.Context) error {
 	return c.String(http.StatusOK, "Hello, Admin!")
 }
 

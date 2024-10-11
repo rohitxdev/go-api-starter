@@ -14,6 +14,7 @@ import (
 )
 
 func TestStorageService(t *testing.T) {
+	os.Setenv("SECRETS_FILE", "../../secrets.json")
 	c, err := config.Load()
 	if err != nil {
 		t.Fatal(err)
