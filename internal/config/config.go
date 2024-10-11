@@ -44,7 +44,7 @@ type Server struct {
 }
 
 type Client struct {
-	Env string `json:"env" validate:"required,oneof=development production"`
+	AppEnv string `json:"appEnv" validate:"required,oneof=development production"`
 }
 
 func Load() (*Server, error) {

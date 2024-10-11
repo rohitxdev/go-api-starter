@@ -73,10 +73,10 @@ const docTemplate = `{
         "config.Client": {
             "type": "object",
             "required": [
-                "env"
+                "appEnv"
             ],
             "properties": {
-                "env": {
+                "appEnv": {
                     "type": "string",
                     "enum": [
                         "development",

@@ -51,7 +51,7 @@ func main() {
 	}
 
 	var logHandler slog.Handler
-	if c.Env == config.EnvDevelopment {
+	if c.AppEnv == config.EnvDevelopment {
 		logHandler = prettylog.NewHandler(os.Stderr, &logOpts)
 	} else {
 		logHandler = slog.NewJSONHandler(os.Stderr, &logOpts)
@@ -59,7 +59,7 @@ func main() {
 
 	slog.SetDefault(slog.New(logHandler))
 
-	slog.Debug(fmt.Sprintf("Running %s on %s in %s environment", config.BuildId, runtime.GOOS+"/"+runtime.GOARCH, c.Env))
+	slog.Debug(fmt.Sprintf("Running %s on %s in %s environment", config.BuildId, runtime.GOOS+"/"+runtime.GOARCH, c.AppEnv))
 
 	// Set maxprocs logger
 	maxprocsLogger := maxprocs.Logger(func(s string, i ...interface{}) {

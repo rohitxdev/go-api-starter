@@ -225,7 +225,7 @@ func New(h *handler) (*echo.Echo, error) {
 	e.GET("/", func(c echo.Context) error {
 		data := echo.Map{
 			"buildId": config.BuildId,
-			"env":     h.config.Env,
+			"appEnv":  h.config.AppEnv,
 			"host":    host,
 		}
 		switch accepts(c) {

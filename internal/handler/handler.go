@@ -162,7 +162,7 @@ func (h *handler) AdminRoute(c echo.Context) error {
 // @Success 200 {object} config.Client
 func (h *handler) GetConfig(c echo.Context) error {
 	clientConfig := config.Client{
-		Env: h.config.Env,
+		AppEnv: h.config.AppEnv,
 	}
 	return c.JSON(http.StatusOK, clientConfig)
 }
