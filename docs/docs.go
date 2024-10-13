@@ -15,6 +15,20 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/": {
+            "get": {
+                "description": "Home page.",
+                "summary": "Home Page",
+                "responses": {
+                    "200": {
+                        "description": "home page",
+                        "schema": {
+                            "type": "html"
+                        }
+                    }
+                }
+            }
+        },
         "/_": {
             "get": {
                 "security": [
@@ -26,7 +40,7 @@ const docTemplate = `{
                 "summary": "Admin route",
                 "responses": {
                     "200": {
-                        "description": "Hello, Admin!",
+                        "description": "Admin page",
                         "schema": {
                             "type": "string"
                         }
@@ -90,12 +104,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.0",
+	Version:          "",
 	Host:             "",
 	BasePath:         "",
 	Schemes:          []string{},
-	Title:            "Starter code API",
-	Description:      "This is a starter code API.",
+	Title:            "",
+	Description:      "",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

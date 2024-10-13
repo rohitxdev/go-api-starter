@@ -1,4 +1,4 @@
-package handler
+package routes
 
 import (
 	"net/http"
@@ -19,7 +19,7 @@ var roleMap = map[string]role{
 	"admin": RoleAdmin,
 }
 
-func (h *handler) requires(role role) echo.MiddlewareFunc {
+func (h *Handler) RequiresAuth(role role) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			sess, err := session.Get("session", c)
@@ -30,7 +30,7 @@ func (h *handler) requires(role role) echo.MiddlewareFunc {
 			if !ok {
 				return c.String(http.StatusUnauthorized, "invalid session")
 			}
-			user, err := h.repo.GetUserById(c.Request().Context(), userId)
+			user, err := h.Repo.GetUserById(c.Request().Context(), userId)
 			if err != nil {
 				return c.String(http.StatusUnauthorized, err.Error())
 			}

@@ -1,4 +1,4 @@
-//go:generate go run github.com/swaggo/swag/cmd/swag@latest init -q -g internal/handler/router.go
+//go:generate go run github.com/swaggo/swag/cmd/swag@latest init -q -g internal/routes/router.go
 package main
 
 import (
@@ -18,10 +18,10 @@ import (
 	"github.com/rohitxdev/go-api-starter/internal/config"
 	"github.com/rohitxdev/go-api-starter/internal/database"
 	"github.com/rohitxdev/go-api-starter/internal/email"
-	"github.com/rohitxdev/go-api-starter/internal/handler"
 	"github.com/rohitxdev/go-api-starter/internal/kv"
 	"github.com/rohitxdev/go-api-starter/internal/prettylog"
 	"github.com/rohitxdev/go-api-starter/internal/repo"
+	"github.com/rohitxdev/go-api-starter/internal/routes"
 	"go.uber.org/automaxprocs/maxprocs"
 )
 
@@ -112,24 +112,24 @@ func main() {
 		panic("connect to s3 client: " + err.Error())
 	}
 
-	h, err := handler.NewHandler(
-		handler.WithConfig(c),
-		handler.WithKVStore(kv),
-		handler.WithRepo(r),
-		handler.WithEmail(&email.Client{}),
-		handler.WithBlobStore(s3Client),
-		handler.WithFileSystem(&fileSystem),
-	)
+	h := routes.NewHandler(&routes.Dependencies{
+		Config:     c,
+		KVStore:    kv,
+		Repo:       r,
+		Email:      &email.Client{},
+		BlobStore:  s3Client,
+		FileSystem: &fileSystem,
+	})
 	if err != nil {
 		panic("create handler: " + err.Error())
 	}
-	e, err := handler.New(h)
+	e, err := routes.NewRouter(h)
 	if err != nil {
 		panic("create router: " + err.Error())
 	}
 
 	//Create tcp listener & start server
-	ls, err := net.Listen("tcp", c.Host+":"+c.Port)
+	ls, err := net.Listen("tcp", c.Address)
 	if err != nil {
 		panic("tcp listen: " + err.Error())
 	}

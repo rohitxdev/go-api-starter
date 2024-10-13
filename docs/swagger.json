@@ -1,12 +1,23 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "This is a starter code API.",
-        "title": "Starter code API",
-        "contact": {},
-        "version": "1.0"
+        "contact": {}
     },
     "paths": {
+        "/": {
+            "get": {
+                "description": "Home page.",
+                "summary": "Home Page",
+                "responses": {
+                    "200": {
+                        "description": "home page",
+                        "schema": {
+                            "type": "html"
+                        }
+                    }
+                }
+            }
+        },
         "/_": {
             "get": {
                 "security": [
@@ -18,7 +29,7 @@
                 "summary": "Admin route",
                 "responses": {
                     "200": {
-                        "description": "Hello, Admin!",
+                        "description": "Admin page",
                         "schema": {
                             "type": "string"
                         }

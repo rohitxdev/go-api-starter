@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"time"
 
@@ -22,6 +23,7 @@ var BuildId string
 
 type Server struct {
 	*Client
+	Address            string         `json:"address" validate:"required"`
 	GoogleOAuth2Config *oauth2.Config `json:"googleOAuth2Config"`
 	Host               string         `json:"host" validate:"required,ip"`
 	Port               string         `json:"port" validate:"required,gte=0"`
@@ -108,16 +110,18 @@ func Load() (*Server, error) {
 	if err = json.Unmarshal(data, &c); err != nil {
 		return nil, fmt.Errorf("could not unmarshal config: %w", err)
 	}
-	if err = validator.New().Struct(c); err != nil {
-		return nil, fmt.Errorf("could not validate config: %w", err)
-	}
 
+	c.Address = net.JoinHostPort(c.Host, c.Port)
 	c.GoogleOAuth2Config = &oauth2.Config{
 		ClientID:     c.GoogleClientId,
 		ClientSecret: c.GoogleClientSecret,
 		Endpoint:     google.Endpoint,
 		RedirectURL:  fmt.Sprintf("https://%s/v1/auth/oauth2/callback/google", c.Host+":"+c.Port),
 		Scopes:       []string{"openid email", "openid profile"},
+	}
+
+	if err = validator.New().Struct(c); err != nil {
+		return nil, fmt.Errorf("could not validate config: %w", err)
 	}
 
 	return &c, err

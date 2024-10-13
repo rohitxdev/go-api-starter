@@ -1,4 +1,4 @@
-package handler
+package routes
 
 import (
 	"errors"
@@ -37,7 +37,7 @@ func createSession(c echo.Context, userId string) (*sessions.Session, error) {
 	return sess, nil
 }
 
-func (h *handler) LogOut(c echo.Context) error {
+func (h *Handler) LogOut(c echo.Context) error {
 	sess, err := session.Get("session", c)
 	if err != nil {
 		return c.String(http.StatusBadRequest, ErrUserNotLoggedIn.Error())
@@ -58,12 +58,12 @@ type logInRequest struct {
 	Password string `form:"password" json:"password" validate:"required"`
 }
 
-func (h *handler) LogIn(c echo.Context) error {
+func (h *Handler) LogIn(c echo.Context) error {
 	req := new(logInRequest)
 	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
-	user, err := h.repo.GetUserByEmail(c.Request().Context(), sanitizeEmail(req.Email))
+	user, err := h.Repo.GetUserByEmail(c.Request().Context(), sanitizeEmail(req.Email))
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ type signUpRequest struct {
 	Password string `json:"password" validate:"required,min=8,max=64"`
 }
 
-func (h *handler) SignUp(c echo.Context) error {
+func (h *Handler) SignUp(c echo.Context) error {
 	req := new(signUpRequest)
 	if err := bindAndValidate(c, req); err != nil {
 		return err
@@ -94,7 +94,7 @@ func (h *handler) SignUp(c echo.Context) error {
 		Email:        sanitizeEmail(req.Email),
 		PasswordHash: string(passwordHash),
 	}
-	userId, err := h.repo.CreateUser(c.Request().Context(), user)
+	userId, err := h.Repo.CreateUser(c.Request().Context(), user)
 	if err != nil {
 		fmt.Println(err)
 		return c.String(http.StatusBadRequest, err.Error())
@@ -110,7 +110,7 @@ type changePasswordRequest struct {
 	NewPassword     string `json:"newPassword" validate:"required,min=8,max=64"`
 }
 
-func (h *handler) ChangePassword(c echo.Context) error {
+func (h *Handler) ChangePassword(c echo.Context) error {
 	req := new(changePasswordRequest)
 	if err := bindAndValidate(c, req); err != nil {
 		return err
@@ -123,7 +123,7 @@ func (h *handler) ChangePassword(c echo.Context) error {
 	if !ok {
 		return c.String(http.StatusUnauthorized, ErrUserNotLoggedIn.Error())
 	}
-	user, err := h.repo.GetUserById(c.Request().Context(), userId)
+	user, err := h.Repo.GetUserById(c.Request().Context(), userId)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
@@ -131,7 +131,7 @@ func (h *handler) ChangePassword(c echo.Context) error {
 		return c.String(http.StatusUnauthorized, err.Error())
 	}
 	hash, _ := bcrypt.GenerateFromPassword([]byte(req.NewPassword), 12)
-	err = h.repo.Update(c.Request().Context(), userId, map[string]any{
+	err = h.Repo.Update(c.Request().Context(), userId, map[string]any{
 		"password_hash": string(hash),
 	})
 	if err != nil {

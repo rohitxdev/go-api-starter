@@ -11,16 +11,22 @@ definitions:
     type: object
 info:
   contact: {}
-  description: This is a starter code API.
-  title: Starter code API
-  version: "1.0"
 paths:
+  /:
+    get:
+      description: Home page.
+      responses:
+        "200":
+          description: home page
+          schema:
+            type: html
+      summary: Home Page
   /_:
     get:
       description: Admin route.
       responses:
         "200":
-          description: Hello, Admin!
+          description: Admin page
           schema:
             type: string
         "401":

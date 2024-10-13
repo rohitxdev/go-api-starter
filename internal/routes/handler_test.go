@@ -1,4 +1,4 @@
-package handler_test
+package routes_test
 
 import (
 	"bytes"
@@ -10,16 +10,16 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/rohitxdev/go-api-starter/internal/config"
-	"github.com/rohitxdev/go-api-starter/internal/handler"
+	"github.com/rohitxdev/go-api-starter/internal/routes"
 	"github.com/stretchr/testify/assert"
 )
 
 type httpRequestOpts struct {
-	method  string
-	path    string
 	query   map[string]string
 	body    echo.Map
 	headers map[string]string
+	method  string
+	path    string
 }
 
 func createHttpRequest(opts *httpRequestOpts) (*http.Request, error) {
@@ -46,9 +46,11 @@ func createHttpRequest(opts *httpRequestOpts) (*http.Request, error) {
 func TestRootRoutes(t *testing.T) {
 	cfg, err := config.Load()
 	assert.Nil(t, err)
-	h, err := handler.NewHandler(handler.WithConfig(cfg))
+	h := routes.NewHandler(&routes.Dependencies{
+		Config: cfg,
+	})
 	assert.Nil(t, err)
-	e, err := handler.New(h)
+	e, err := routes.NewRouter(h)
 	assert.Nil(t, err)
 
 	t.Run("GET /", func(t *testing.T) {
@@ -59,7 +61,7 @@ func TestRootRoutes(t *testing.T) {
 		assert.Nil(t, err)
 		res := httptest.NewRecorder()
 		c := e.NewContext(req, res)
-		_ = h.Ping(c)
+		_ = h.GetPing(c)
 		assert.Equal(t, http.StatusOK, res.Code)
 	})
 
@@ -71,7 +73,7 @@ func TestRootRoutes(t *testing.T) {
 		assert.Nil(t, err)
 		res := httptest.NewRecorder()
 		c := e.NewContext(req, res)
-		_ = h.Ping(c)
+		_ = h.GetPing(c)
 		assert.Equal(t, http.StatusOK, res.Code)
 		assert.Equal(t, "pong", res.Body.String())
 	})
