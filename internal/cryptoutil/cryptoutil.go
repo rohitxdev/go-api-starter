@@ -89,10 +89,25 @@ func VerifyJWT(token string, secret string) (string, error) {
 	return claims.Id, nil
 }
 
-func GenerateAccessAndRefreshTokens(userId string, accessTokenExpiry time.Duration, refreshTokenExpiry time.Duration, secret string) (string, string) {
-	accessToken, _ := GenerateJWT(userId, accessTokenExpiry, secret)
-	refreshToken, _ := GenerateJWT(userId, refreshTokenExpiry, secret)
-	return accessToken, refreshToken
+type Tokens struct {
+	AccessToken  string `json:"accessToken"`
+	RefreshToken string `json:"refreshToken"`
+}
+
+func GenerateAccessAndRefreshTokens(userId string, accessTokenExpiry time.Duration, refreshTokenExpiry time.Duration, secret string) (*Tokens, error) {
+	accessToken, err := GenerateJWT(userId, accessTokenExpiry, secret)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate access token: %w", err)
+	}
+	refreshToken, err := GenerateJWT(userId, refreshTokenExpiry, secret)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate refresh token: %w", err)
+	}
+	tokens := Tokens{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}
+	return &tokens, err
 }
 
 func RandomString() string {
