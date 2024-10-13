@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
-	"github.com/rohitxdev/go-api-starter/pkg/id"
+	"github.com/rohitxdev/go-api-starter/internal/id"
 )
 
 var (
@@ -39,7 +39,7 @@ type User struct {
 
 func (repo *Repo) GetUserById(ctx context.Context, userId string) (*User, error) {
 	user := new(User)
-	err := repo.stmts.GetUserById.QueryRowContext(ctx, userId).Scan(&user.Id, &user.Role, &user.Email, &user.PasswordHash, &user.Username, &user.FullName, &user.DateOfBirth, &user.Gender, &user.PhoneNumber, &user.AccountStatus, &user.ImageUrl, &user.CreatedAt, &user.UpdatedAt)
+	err := repo.db.QueryRowContext(ctx, `SELECT id, role, email, password_hash, COALESCE(username, ''), COALESCE(full_name, ''), COALESCE(date_of_birth, '-infinity'), COALESCE(gender, ''), COALESCE(phone_number, ''), COALESCE(account_status, ''), COALESCE(image_url, ''), created_at, updated_at FROM users WHERE id=$1 LIMIT 1;`, userId).Scan(&user.Id, &user.Role, &user.Email, &user.PasswordHash, &user.Username, &user.FullName, &user.DateOfBirth, &user.Gender, &user.PhoneNumber, &user.AccountStatus, &user.ImageUrl, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -86,11 +86,6 @@ func (repo *Repo) CreateUser(ctx context.Context, user *UserCore) (string, error
 		return "", err
 	}
 	return userId, nil
-}
-
-func (repo *Repo) DeleteUserById(ctx context.Context, id string) error {
-	_, err := repo.stmts.DeleteUserById.ExecContext(ctx, id)
-	return err
 }
 
 func (repo *Repo) Update(ctx context.Context, id string, updates map[string]any) error {

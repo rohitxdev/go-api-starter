@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/rohitxdev/go-api-starter/pkg/database"
+	"github.com/rohitxdev/go-api-starter/internal/database"
 	"github.com/stretchr/testify/assert"
 )
 

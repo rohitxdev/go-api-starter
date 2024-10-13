@@ -161,13 +161,13 @@ task_test() {
 # Run tests and show coverage
 task_test_cover() {
     print loading "running tests and generating coverage report..."
-    go test --race --coverprofile=./tmp/coverage.out ./... && go tool cover --html=./tmp/coverage.out
+    SECRETS_FILE=../../secrets.json go test --race --coverprofile=./tmp/coverage.out ./... && go tool cover --html=./tmp/coverage.out
 }
 
 # Run benchmarks
 task_benchmark() {
     print loading "running benchmarks..."
-    go test --race --count=2 -v --benchmem --bench=. ./...
+    SECRETS_FILE=../../secrets.json go test --race --count=2 -v --benchmem --bench=. ./...
 }
 
 # Clean go mod & cache & remove build artifacts

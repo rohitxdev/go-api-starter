@@ -24,21 +24,20 @@ type Store struct {
 }
 
 func New(endpoint string, region string, accessKeyId string, accessKeySecret string) (*Store, error) {
-	r2Resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+	customResolver := aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
 		return aws.Endpoint{
 			URL: endpoint,
 		}, nil
 	})
 
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
-		config.WithEndpointResolverWithOptions(r2Resolver),
+		config.WithEndpointResolver(customResolver),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKeyId, accessKeySecret, "")),
+		config.WithRegion(region),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not load default config of S3 client: %w", err)
 	}
-
-	cfg.Region = region
 
 	s3Client := s3.NewFromConfig(cfg)
 

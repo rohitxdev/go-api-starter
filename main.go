@@ -14,14 +14,14 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/rohitxdev/go-api-starter/internal/blobstore"
 	"github.com/rohitxdev/go-api-starter/internal/config"
+	"github.com/rohitxdev/go-api-starter/internal/database"
+	"github.com/rohitxdev/go-api-starter/internal/email"
 	"github.com/rohitxdev/go-api-starter/internal/handler"
-	"github.com/rohitxdev/go-api-starter/pkg/blobstore"
-	"github.com/rohitxdev/go-api-starter/pkg/database"
-	"github.com/rohitxdev/go-api-starter/pkg/email"
-	"github.com/rohitxdev/go-api-starter/pkg/kvstore"
-	"github.com/rohitxdev/go-api-starter/pkg/prettylog"
-	"github.com/rohitxdev/go-api-starter/pkg/repo"
+	"github.com/rohitxdev/go-api-starter/internal/kv"
+	"github.com/rohitxdev/go-api-starter/internal/prettylog"
+	"github.com/rohitxdev/go-api-starter/internal/repo"
 	"go.uber.org/automaxprocs/maxprocs"
 )
 
@@ -90,7 +90,7 @@ func main() {
 	}
 
 	//Connect to kv store
-	kv, err := kvstore.New(sqliteDb, time.Minute*5)
+	kv, err := kv.New(sqliteDb, time.Minute*5)
 	if err != nil {
 		panic("connect to KV store: " + err.Error())
 	}

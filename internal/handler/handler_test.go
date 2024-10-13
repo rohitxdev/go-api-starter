@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"testing"
 
 	"github.com/labstack/echo/v4"
@@ -45,7 +44,6 @@ func createHttpRequest(opts *httpRequestOpts) (*http.Request, error) {
 }
 
 func TestRootRoutes(t *testing.T) {
-	os.Setenv("SECRETS_FILE", "../../secrets.json")
 	cfg, err := config.Load()
 	assert.Nil(t, err)
 	h, err := handler.NewHandler(handler.WithConfig(cfg))

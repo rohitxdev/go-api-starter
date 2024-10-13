@@ -7,16 +7,16 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	"github.com/rohitxdev/go-api-starter/internal/blobstore"
 	"github.com/rohitxdev/go-api-starter/internal/config"
-	"github.com/rohitxdev/go-api-starter/pkg/blobstore"
-	"github.com/rohitxdev/go-api-starter/pkg/email"
-	"github.com/rohitxdev/go-api-starter/pkg/kvstore"
-	"github.com/rohitxdev/go-api-starter/pkg/repo"
+	"github.com/rohitxdev/go-api-starter/internal/email"
+	"github.com/rohitxdev/go-api-starter/internal/kv"
+	"github.com/rohitxdev/go-api-starter/internal/repo"
 )
 
 type handlerOpts struct {
 	config     *config.Server
-	kvStore    *kvstore.KVStore
+	kvStore    *kv.Store
 	repo       *repo.Repo
 	email      *email.Client
 	blobstore  *blobstore.Store
@@ -29,7 +29,7 @@ func WithConfig(config *config.Server) func(*handlerOpts) {
 	}
 }
 
-func WithKVStore(kvStore *kvstore.KVStore) func(*handlerOpts) {
+func WithKVStore(kvStore *kv.Store) func(*handlerOpts) {
 	return func(ho *handlerOpts) {
 		ho.kvStore = kvStore
 	}

@@ -9,12 +9,11 @@ import (
 	"os"
 	"testing"
 
+	"github.com/rohitxdev/go-api-starter/internal/blobstore"
 	"github.com/rohitxdev/go-api-starter/internal/config"
-	"github.com/rohitxdev/go-api-starter/pkg/blobstore"
 )
 
 func TestStorageService(t *testing.T) {
-	os.Setenv("SECRETS_FILE", "../../secrets.json")
 	c, err := config.Load()
 	if err != nil {
 		t.Fatal(err)

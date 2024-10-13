@@ -20,8 +20,8 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/rohitxdev/go-api-starter/docs"
 	"github.com/rohitxdev/go-api-starter/internal/config"
-	"github.com/rohitxdev/go-api-starter/pkg/id"
-	"github.com/rohitxdev/go-api-starter/pkg/repo"
+	"github.com/rohitxdev/go-api-starter/internal/id"
+	"github.com/rohitxdev/go-api-starter/internal/repo"
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"golang.org/x/time/rate"
 )
@@ -103,7 +103,9 @@ func New(h *handler) (*echo.Echo, error) {
 		echo.TrustPrivateNet(false), // e.g. ipv4 start with 10. or 192.168
 	)
 
-	e.Pre(middleware.CSRF())
+	if h.config.AppEnv != config.EnvDevelopment {
+		e.Pre(middleware.CSRF())
+	}
 
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
 		Root:       "web",
@@ -238,7 +240,7 @@ func New(h *handler) (*echo.Echo, error) {
 
 	e.GET("/ping", h.Ping)
 
-	e.GET("/_", h.Admin, h.protected(RoleAdmin))
+	e.GET("/_", h.Admin, h.requires(RoleAdmin))
 
 	e.GET("/config", h.GetConfig)
 

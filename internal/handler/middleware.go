@@ -10,7 +10,7 @@ import (
 type role uint8
 
 const (
-	RoleUser role = iota + 1
+	RoleUser role = iota
 	RoleAdmin
 )
 
@@ -19,7 +19,7 @@ var roleMap = map[string]role{
 	"admin": RoleAdmin,
 }
 
-func (h *handler) protected(role role) echo.MiddlewareFunc {
+func (h *handler) requires(role role) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			sess, err := session.Get("session", c)

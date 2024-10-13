@@ -3,7 +3,7 @@ package cryptoutil_test
 import (
 	"testing"
 
-	"github.com/rohitxdev/go-api-starter/pkg/cryptoutil"
+	"github.com/rohitxdev/go-api-starter/internal/cryptoutil"
 	"github.com/stretchr/testify/assert"
 )
 
