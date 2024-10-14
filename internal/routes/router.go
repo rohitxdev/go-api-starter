@@ -124,11 +124,13 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		AllowOrigins: h.Config.AllowedOrigins,
 	}))
 	e.Pre(middleware.CSRF())
-	e.Pre(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
-		Store: middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
-			Rate:      rate.Limit(h.Config.RateLimitPerMinute),
-			ExpiresIn: time.Minute,
-		})}))
+	if h.Config.RateLimitPerMinute > 0 {
+		e.Pre(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
+			Store: middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
+				Rate:      rate.Limit(h.Config.RateLimitPerMinute),
+				ExpiresIn: time.Minute,
+			})}))
+	}
 	e.Pre(middleware.Secure())
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
 		Root:       "web/public",
@@ -192,6 +194,7 @@ func registerRoutes(e *echo.Echo, h *Handler) {
 	e.GET("/ping", h.GetPing)
 	e.GET("/config", h.GetConfig)
 	e.GET("/_", h.GetAdmin, h.RequiresAuth(RoleAdmin))
+	e.GET("/", h.GetHome)
 
 	v1 := e.Group("/v1")
 	{
