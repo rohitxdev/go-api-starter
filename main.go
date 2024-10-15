@@ -36,7 +36,7 @@ func main() {
 	//Load config
 	c, err := config.Load()
 	if err != nil {
-		panic("load config: " + err.Error())
+		panic("failed to load config: " + err.Error())
 	}
 
 	//Set up logger
@@ -59,7 +59,7 @@ func main() {
 
 	slog.SetDefault(slog.New(logHandler))
 
-	slog.Debug(fmt.Sprintf("running %s on %s in %s environment", config.BuildId, runtime.GOOS+"/"+runtime.GOARCH, c.AppEnv))
+	slog.Debug(fmt.Sprintf("running %s on %s/%s in %s environment", config.BuildId, runtime.GOOS, runtime.GOARCH, c.AppEnv))
 
 	// Set maxprocs logger
 	maxprocsLogger := maxprocs.Logger(func(s string, i ...interface{}) {
@@ -67,17 +67,17 @@ func main() {
 	})
 
 	if _, err = maxprocs.Set(maxprocsLogger); err != nil {
-		panic("set maxprocs logger: " + err.Error())
+		panic("failed to set maxprocs logger: " + err.Error())
 	}
 
 	//Connect to postgres database
 	db, err := database.NewPostgres(c.DatabaseUrl)
 	if err != nil {
-		panic("connect to database: " + err.Error())
+		panic("failed to connect to database: " + err.Error())
 	}
 	defer func() {
 		if err = db.Close(); err != nil {
-			panic("close database: " + err.Error())
+			panic("failed to close database: " + err.Error())
 		}
 		slog.Debug("database connection closed")
 	}()
@@ -86,13 +86,13 @@ func main() {
 	//Connect to sqlite database
 	sqliteDb, err := database.NewSqlite(":memory:")
 	if err != nil {
-		panic("connect to sqlite database: " + err.Error())
+		panic("failed to connect to sqlite database: " + err.Error())
 	}
 
 	//Connect to kv store
 	kv, err := kv.New(sqliteDb, time.Minute*5)
 	if err != nil {
-		panic("connect to KV store: " + err.Error())
+		panic("failed to connect to kv store: " + err.Error())
 	}
 	defer func() {
 		kv.Close()
@@ -103,13 +103,13 @@ func main() {
 	//Create API handler
 	r, err := repo.New(db)
 	if err != nil {
-		panic("create repo: " + err.Error())
+		panic("failed to create repo: " + err.Error())
 	}
 	defer r.Close()
 
 	s3Client, err := blobstore.New(c.S3Endpoint, c.S3DefaultRegion, c.AwsAccessKeyId, c.AwsAccessKeySecret)
 	if err != nil {
-		panic("connect to s3 client: " + err.Error())
+		panic("failed to connect to s3 client: " + err.Error())
 	}
 
 	h := routes.NewHandler(&routes.Dependencies{
@@ -121,21 +121,21 @@ func main() {
 		FileSystem: &fileSystem,
 	})
 	if err != nil {
-		panic("create handler: " + err.Error())
+		panic("failed to create handler: " + err.Error())
 	}
 	e, err := routes.NewRouter(h)
 	if err != nil {
-		panic("create router: " + err.Error())
+		panic("failed to create router: " + err.Error())
 	}
 
 	//Create tcp listener & start server
 	ls, err := net.Listen("tcp", c.Address)
 	if err != nil {
-		panic("tcp listen: " + err.Error())
+		panic("failed to listen on tcp: " + err.Error())
 	}
 	defer func() {
 		if err = ls.Close(); err != nil {
-			panic("close tcp listener: " + err.Error())
+			panic("failed to close tcp listener: " + err.Error())
 		}
 		slog.Debug("tcp listener closed")
 	}()
@@ -143,7 +143,7 @@ func main() {
 
 	go func() {
 		if err := http.Serve(ls, e); err != nil && !errors.Is(err, net.ErrClosed) {
-			panic("serve http: " + err.Error())
+			panic("failed to serve http: " + err.Error())
 		}
 	}()
 
@@ -160,7 +160,7 @@ func main() {
 	defer cancel()
 
 	if err := e.Shutdown(ctx); err != nil {
-		panic("http server shutdown: " + err.Error())
+		panic("failed to shutdown http server: " + err.Error())
 	}
 
 	slog.Debug("http server shut down gracefully")
