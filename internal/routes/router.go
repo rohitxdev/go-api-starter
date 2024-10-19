@@ -18,6 +18,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/rohitxdev/go-api-starter/docs"
+	"github.com/rohitxdev/go-api-starter/internal/id"
 	"github.com/rohitxdev/go-api-starter/internal/repo"
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"golang.org/x/time/rate"
@@ -65,39 +66,9 @@ func (s customJSONSerializer) Deserialize(c echo.Context, v any) error {
 	return err
 }
 
-func logRequest(c echo.Context, v middleware.RequestLoggerValues) error {
-	var userId string
-	user, ok := c.Get("user").(*repo.User)
-	if ok && (user != nil) {
-		userId = user.Id
-	}
-
-	slog.InfoContext(
-		c.Request().Context(),
-		"http request",
-		slog.Group("request",
-			slog.String("id", v.RequestID),
-			slog.String("clientIp", v.RemoteIP),
-			slog.String("protocol", v.Protocol),
-			slog.String("uri", v.URI),
-			slog.String("method", v.Method),
-			slog.String("referer", v.Referer),
-			slog.String("userAgent", v.UserAgent),
-			slog.String("contentLength", v.ContentLength),
-			slog.Duration("durationMs", time.Duration(v.Latency.Milliseconds())),
-		),
-		slog.Group("response",
-			slog.Int("status", v.Status),
-			slog.Int64("sizeBytes", v.ResponseSize),
-		),
-		slog.String("userId", userId),
-		slog.Any("error", v.Error),
-	)
-
-	return nil
-}
-
 func NewRouter(h *Handler) (*echo.Echo, error) {
+	docs.SwaggerInfo.Host = h.Config.Address
+
 	e := echo.New()
 	e.HideBanner = true
 	e.HidePort = true
@@ -119,6 +90,12 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		templates: templates,
 	}
 
+	setUpMiddleware(e, h)
+	setUpRoutes(e, h)
+	return e, nil
+}
+
+func setUpMiddleware(e *echo.Echo, h *Handler) {
 	//Pre-router middlewares
 	e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: h.Config.AllowedOrigins,
@@ -142,6 +119,11 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		},
 	}))
 	e.Pre(session.Middleware(sessions.NewCookieStore([]byte(h.Config.SessionSecret))))
+	e.Pre(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
+		Generator: func() string {
+			return id.New(id.Request)
+		},
+	}))
 	e.Pre(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogRequestID:     true,
 		LogRemoteIP:      true,
@@ -155,7 +137,37 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		LogUserAgent:     true,
 		LogError:         true,
 		LogContentLength: true,
-		LogValuesFunc:    logRequest,
+		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
+			var userId string
+			user, ok := c.Get("user").(*repo.User)
+			if ok && (user != nil) {
+				userId = user.Id
+			}
+
+			slog.InfoContext(
+				c.Request().Context(),
+				"http request",
+				slog.Group("request",
+					slog.String("id", v.RequestID),
+					slog.String("clientIp", v.RemoteIP),
+					slog.String("protocol", v.Protocol),
+					slog.String("uri", v.URI),
+					slog.String("method", v.Method),
+					slog.String("referer", v.Referer),
+					slog.String("userAgent", v.UserAgent),
+					slog.String("contentLength", v.ContentLength),
+					slog.Duration("durationMs", time.Duration(v.Latency.Milliseconds())),
+				),
+				slog.Group("response",
+					slog.Int("status", v.Status),
+					slog.Int64("sizeBytes", v.ResponseSize),
+				),
+				slog.String("userId", userId),
+				slog.Any("error", v.Error),
+			)
+
+			return nil
+		},
 	}))
 	e.Pre(middleware.RemoveTrailingSlash())
 
@@ -178,15 +190,10 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		}},
 	))
 	e.Use(echoprometheus.NewMiddleware("api"))
-
-	docs.SwaggerInfo.Host = h.Config.Address
 	pprof.Register(e)
-	registerRoutes(e, h)
-
-	return e, nil
 }
 
-func registerRoutes(e *echo.Echo, h *Handler) {
+func setUpRoutes(e *echo.Echo, h *Handler) {
 	e.GET("/metrics", echoprometheus.NewHandler())
 	e.GET("/swagger/*", echoSwagger.EchoWrapHandler(func(c *echoSwagger.Config) {
 		c.SyntaxHighlight = true

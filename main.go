@@ -33,10 +33,14 @@ func main() {
 		panic("build id is not set")
 	}
 
+	if _, err := maxprocs.Set(); err != nil {
+		panic("could not set maxprocs: " + err.Error())
+	}
+
 	//Load config
 	c, err := config.Load()
 	if err != nil {
-		panic("failed to load config: " + err.Error())
+		panic("could not load config: " + err.Error())
 	}
 
 	//Set up logger
@@ -59,57 +63,48 @@ func main() {
 
 	slog.SetDefault(slog.New(logHandler))
 
-	slog.Debug(fmt.Sprintf("running %s on %s/%s in %s environment", config.BuildId, runtime.GOOS, runtime.GOARCH, c.AppEnv))
-
-	// Set maxprocs logger
-	maxprocsLogger := maxprocs.Logger(func(s string, i ...interface{}) {
-		slog.Debug(fmt.Sprintf(s, i...))
-	})
-
-	if _, err = maxprocs.Set(maxprocsLogger); err != nil {
-		panic("failed to set maxprocs logger: " + err.Error())
-	}
+	slog.Debug(fmt.Sprintf("BuildId: %s, Platform: %s/%s, MaxProcs: %d, AppEnv: %s", config.BuildId, runtime.GOOS, runtime.GOARCH, runtime.GOMAXPROCS(0), c.AppEnv))
 
 	//Connect to postgres database
 	db, err := database.NewPostgres(c.DatabaseUrl)
 	if err != nil {
-		panic("failed to connect to database: " + err.Error())
+		panic("could not connect to database: " + err.Error())
 	}
 	defer func() {
 		if err = db.Close(); err != nil {
-			panic("failed to close database: " + err.Error())
+			panic("could not close database: " + err.Error())
 		}
-		slog.Debug("database connection closed")
+		slog.Debug("Database connection closed")
 	}()
-	slog.Debug("connected to database")
+	slog.Debug("Connected to database")
 
 	//Connect to sqlite database
 	sqliteDb, err := database.NewSqlite(":memory:")
 	if err != nil {
-		panic("failed to connect to sqlite database: " + err.Error())
+		panic("could not connect to sqlite database: " + err.Error())
 	}
 
 	//Connect to kv store
 	kv, err := kv.New(sqliteDb, time.Minute*5)
 	if err != nil {
-		panic("failed to connect to kv store: " + err.Error())
+		panic("could not connect to kv store: " + err.Error())
 	}
 	defer func() {
 		kv.Close()
 		slog.Debug("kv store closed")
 	}()
-	slog.Debug("connected to kv store")
+	slog.Debug("Connected to KV store")
 
 	//Create API handler
 	r, err := repo.New(db)
 	if err != nil {
-		panic("failed to create repo: " + err.Error())
+		panic("could not create repo: " + err.Error())
 	}
 	defer r.Close()
 
 	s3Client, err := blobstore.New(c.S3Endpoint, c.S3DefaultRegion, c.AwsAccessKeyId, c.AwsAccessKeySecret)
 	if err != nil {
-		panic("failed to connect to s3 client: " + err.Error())
+		panic("could not connect to s3 client: " + err.Error())
 	}
 
 	h := routes.NewHandler(&routes.Dependencies{
@@ -121,36 +116,34 @@ func main() {
 		FileSystem: &fileSystem,
 	})
 	if err != nil {
-		panic("failed to create handler: " + err.Error())
+		panic("could not create handler: " + err.Error())
 	}
 	e, err := routes.NewRouter(h)
 	if err != nil {
-		panic("failed to create router: " + err.Error())
+		panic("could not create router: " + err.Error())
 	}
 
-	//Create tcp listener & start server
+	//Start HTTP server
 	ls, err := net.Listen("tcp", c.Address)
 	if err != nil {
-		panic("failed to listen on tcp: " + err.Error())
+		panic("could not listen on tcp: " + err.Error())
 	}
 	defer func() {
 		if err = ls.Close(); err != nil {
-			panic("failed to close tcp listener: " + err.Error())
+			panic("could not close tcp listener: " + err.Error())
 		}
-		slog.Debug("tcp listener closed")
 	}()
-	slog.Debug("tcp listener created")
 
 	go func() {
 		if err := http.Serve(ls, e); err != nil && !errors.Is(err, net.ErrClosed) {
-			panic("failed to serve http: " + err.Error())
+			panic("could not serve http: " + err.Error())
 		}
 	}()
 
-	slog.Debug("http server started")
-	slog.Info(fmt.Sprintf("server is listening to http://%s and is ready to serve requests", ls.Addr()))
+	slog.Debug("HTTP server started")
+	slog.Info(fmt.Sprintf("Server is listening to http://%s and is ready to serve requests", ls.Addr()))
 
-	//Shut down http server gracefully
+	//Shut down HTTP server gracefully
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
@@ -160,8 +153,8 @@ func main() {
 	defer cancel()
 
 	if err := e.Shutdown(ctx); err != nil {
-		panic("failed to shutdown http server: " + err.Error())
+		panic("could not shutdown http server: " + err.Error())
 	}
 
-	slog.Debug("http server shut down gracefully")
+	slog.Debug("HTTP server shut down gracefully")
 }
