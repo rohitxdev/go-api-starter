@@ -146,7 +146,7 @@ func setUpMiddleware(e *echo.Echo, h *Handler) {
 
 			slog.InfoContext(
 				c.Request().Context(),
-				"http request",
+				"HTTP request",
 				slog.Group("request",
 					slog.String("id", v.RequestID),
 					slog.String("clientIp", v.RemoteIP),
