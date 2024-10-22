@@ -1,5 +1,5 @@
 // Package prettylog provides a slog handler that pretty prints logs in JSON format for development purposes.
-package prettylog
+package logger
 
 import (
 	"bytes"
@@ -77,28 +77,31 @@ func getLevelColor(level slog.Level) string {
 	}
 }
 
-type logHandler struct {
+func getLevelLabel(level slog.Level) string {
+	switch level {
+	case slog.LevelDebug:
+		return "DBG"
+	case slog.LevelInfo:
+		return "INF"
+	case slog.LevelWarn:
+		return "WRN"
+	case slog.LevelError:
+		return "ERR"
+	default:
+		return "???"
+	}
+}
+
+type prettyLogHandler struct {
 	handler slog.Handler
 	buf     *bytes.Buffer
 	mu      *sync.Mutex
 	w       io.Writer
 }
 
-var _ slog.Handler = (*logHandler)(nil)
+var _ slog.Handler = (*prettyLogHandler)(nil)
 
-// Prints pretty logs in both plain text and JSON formats depending on the number of attributes. To be used only for development.
-func NewHandler(w io.Writer, opts *slog.HandlerOptions) *logHandler {
-	buf := new(bytes.Buffer)
-	return &logHandler{
-		//pass buffer instead of given writer to inner handler
-		handler: slog.NewJSONHandler(buf, opts),
-		buf:     buf,
-		mu:      &sync.Mutex{},
-		w:       w,
-	}
-}
-
-func (h *logHandler) computeAttrs(ctx context.Context, r slog.Record) (map[string]any, error) {
+func (h *prettyLogHandler) computeAttrs(ctx context.Context, r slog.Record) (map[string]any, error) {
 	h.mu.Lock()
 	defer func() {
 		h.buf.Reset()
@@ -117,14 +120,14 @@ func (h *logHandler) computeAttrs(ctx context.Context, r slog.Record) (map[strin
 	return attrs, nil
 }
 
-func (h *logHandler) Handle(ctx context.Context, r slog.Record) error {
+func (h *prettyLogHandler) Handle(ctx context.Context, r slog.Record) error {
 	attrs, err := h.computeAttrs(ctx, r)
 	if err != nil {
 		return err
 	}
 
-	timeStr := colorize(ansiGrey, r.Time.Format("[15:04:05]"))
-	levelStr := colorize(getLevelColor(r.Level), r.Level.String())
+	timeStr := colorize(ansiGrey, r.Time.Format("03:04PM"))
+	levelStr := colorize(getLevelColor(r.Level), getLevelLabel(r.Level))
 	msgStr := colorize(ansiWhite, r.Message)
 
 	logStr := fmt.Sprintf("%s %s %s", timeStr, levelStr, msgStr)
@@ -148,22 +151,47 @@ func (h *logHandler) Handle(ctx context.Context, r slog.Record) error {
 	return nil
 }
 
-func (h *logHandler) Enabled(ctx context.Context, level slog.Level) bool {
+func (h *prettyLogHandler) Enabled(ctx context.Context, level slog.Level) bool {
 	return h.handler.Enabled(ctx, level)
 }
 
-func (h *logHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return &logHandler{
+func (h *prettyLogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &prettyLogHandler{
 		handler: h.handler.WithAttrs(attrs),
 		buf:     h.buf,
 		mu:      h.mu,
 	}
 }
 
-func (h *logHandler) WithGroup(name string) slog.Handler {
-	return &logHandler{
+func (h *prettyLogHandler) WithGroup(name string) slog.Handler {
+	return &prettyLogHandler{
 		handler: h.handler.WithGroup(name),
 		buf:     h.buf,
 		mu:      h.mu,
 	}
+}
+
+type HandlerOptions struct {
+	ReplaceAttr func(groups []string, a slog.Attr) slog.Attr
+	Level       slog.Level
+	NoColor     bool
+}
+
+func New(w io.Writer, opts *HandlerOptions) *slog.Logger {
+	slogOpts := slog.HandlerOptions{
+		Level:       opts.Level,
+		ReplaceAttr: opts.ReplaceAttr,
+	}
+	var handler slog.Handler = slog.NewJSONHandler(w, &slogOpts)
+	if !opts.NoColor {
+		buf := new(bytes.Buffer)
+		handler = &prettyLogHandler{
+			//pass buffer instead of given writer to inner handler
+			handler: slog.NewJSONHandler(buf, &slogOpts),
+			buf:     buf,
+			mu:      &sync.Mutex{},
+			w:       w,
+		}
+	}
+	return slog.New(handler)
 }

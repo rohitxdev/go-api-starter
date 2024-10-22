@@ -36,7 +36,7 @@ func NewHandler(deps *Dependencies) *Handler {
 func (h *Handler) GetHome(c echo.Context) error {
 	data := echo.Map{
 		"buildId": config.BuildId,
-		"appEnv":  h.Config.AppEnv,
+		"env":     h.Config.Env,
 	}
 	switch accepts(c) {
 	case "text/html":
@@ -60,7 +60,7 @@ func (h *Handler) GetPing(c echo.Context) error {
 // @Success 200 {object} config.Client
 func (h *Handler) GetConfig(c echo.Context) error {
 	clientConfig := config.Client{
-		AppEnv: h.Config.AppEnv,
+		Env: h.Config.Env,
 	}
 	return c.JSON(http.StatusOK, clientConfig)
 }

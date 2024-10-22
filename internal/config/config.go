@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	EnvDevelopment = "development"
-	EnvProduction  = "production"
+	envDevelopment = "development"
+	envProduction  = "production"
 )
 
 // This is set at build time.
@@ -46,11 +46,13 @@ type Server struct {
 }
 
 type Client struct {
-	AppEnv string `json:"appEnv" validate:"required,oneof=development production"`
+	Env   string `json:"env" validate:"required,oneof=development production"`
+	IsDev bool   `json:"isDev"`
 }
 
 func Load() (*Server, error) {
 	m := map[string]any{
+		"env":  os.Getenv("ENV"),
 		"host": os.Getenv("HOST"),
 		"port": os.Getenv("PORT"),
 	}
@@ -119,6 +121,7 @@ func Load() (*Server, error) {
 		RedirectURL:  fmt.Sprintf("https://%s/v1/auth/oauth2/callback/google", c.Host+":"+c.Port),
 		Scopes:       []string{"openid email", "openid profile"},
 	}
+	c.IsDev = c.Env != envProduction
 
 	if err = validator.New().Struct(c); err != nil {
 		return nil, fmt.Errorf("could not validate config: %w", err)

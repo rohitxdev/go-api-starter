@@ -19,7 +19,7 @@ import (
 	"github.com/rohitxdev/go-api-starter/internal/database"
 	"github.com/rohitxdev/go-api-starter/internal/email"
 	"github.com/rohitxdev/go-api-starter/internal/kv"
-	"github.com/rohitxdev/go-api-starter/internal/prettylog"
+	"github.com/rohitxdev/go-api-starter/internal/logger"
 	"github.com/rohitxdev/go-api-starter/internal/repo"
 	"github.com/rohitxdev/go-api-starter/internal/routes"
 	"go.uber.org/automaxprocs/maxprocs"
@@ -44,7 +44,7 @@ func main() {
 	}
 
 	//Set up logger
-	logOpts := slog.HandlerOptions{
+	loggerOpts := logger.HandlerOptions{
 		Level: slog.LevelDebug,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 			if a.Value.String() == "" || a.Value.Equal(slog.AnyValue(nil)) {
@@ -52,18 +52,11 @@ func main() {
 			}
 			return a
 		},
+		NoColor: !c.IsDev,
 	}
+	slog.SetDefault(logger.New(os.Stderr, &loggerOpts))
 
-	var logHandler slog.Handler
-	if c.AppEnv == config.EnvDevelopment {
-		logHandler = prettylog.NewHandler(os.Stderr, &logOpts)
-	} else {
-		logHandler = slog.NewJSONHandler(os.Stderr, &logOpts)
-	}
-
-	slog.SetDefault(slog.New(logHandler))
-
-	slog.Debug(fmt.Sprintf("BuildId: %s, Platform: %s/%s, MaxProcs: %d, AppEnv: %s", config.BuildId, runtime.GOOS, runtime.GOARCH, runtime.GOMAXPROCS(0), c.AppEnv))
+	slog.Debug(fmt.Sprintf("BuildId: %s, Platform: %s/%s, MaxProcs: %d, Env: %s", config.BuildId, runtime.GOOS, runtime.GOARCH, runtime.GOMAXPROCS(0), c.Env))
 
 	//Connect to postgres database
 	db, err := database.NewPostgres(c.DatabaseUrl)
@@ -91,7 +84,7 @@ func main() {
 	}
 	defer func() {
 		kv.Close()
-		slog.Debug("kv store closed")
+		slog.Debug("KV store closed")
 	}()
 	slog.Debug("Connected to KV store")
 
@@ -141,7 +134,7 @@ func main() {
 	}()
 
 	slog.Debug("HTTP server started")
-	slog.Info(fmt.Sprintf("Server is listening to http://%s and is ready to serve requests", ls.Addr()))
+	slog.Info(fmt.Sprintf("Server is listening on http://%s and is ready to serve requests", ls.Addr()))
 
 	//Shut down HTTP server gracefully
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)

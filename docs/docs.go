@@ -87,15 +87,18 @@ const docTemplate = `{
         "config.Client": {
             "type": "object",
             "required": [
-                "appEnv"
+                "env"
             ],
             "properties": {
-                "appEnv": {
+                "env": {
                     "type": "string",
                     "enum": [
                         "development",
                         "production"
                     ]
+                },
+                "isDev": {
+                    "type": "boolean"
                 }
             }
         }

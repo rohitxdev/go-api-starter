@@ -1,13 +1,15 @@
 definitions:
   config.Client:
     properties:
-      appEnv:
+      env:
         enum:
         - development
         - production
         type: string
+      isDev:
+        type: boolean
     required:
-    - appEnv
+    - env
     type: object
 info:
   contact: {}
