@@ -172,7 +172,7 @@ task_benchmark() {
 
 # Clean go mod & cache & remove build artifacts
 task_clean() {
-    print loading "cleaning up..."
+    print loading "cleaning..."
     go mod tidy -v
     go clean --cache
     rm -rf ./bin ./.tmp

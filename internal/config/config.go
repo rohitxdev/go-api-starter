@@ -32,6 +32,7 @@ type Server struct {
 	SmtpHost           string         `json:"smtpHost" validate:"required"`
 	SmtpUsername       string         `json:"smtpUsername" validate:"required"`
 	SmtpPassword       string         `json:"smtpPassword" validate:"required"`
+	SenderEmail        string         `json:"senderEmail" validate:"required"`
 	S3BucketName       string         `json:"s3BucketName"`
 	S3Endpoint         string         `json:"s3Endpoint"`
 	S3DefaultRegion    string         `json:"s3DefaultRegion"`
@@ -39,6 +40,7 @@ type Server struct {
 	AwsAccessKeySecret string         `json:"awsAccessKeySecret"`
 	GoogleClientId     string         `json:"googleClientId"`
 	GoogleClientSecret string         `json:"googleClientSecret"`
+	JwtSecret          string         `json:"jwtSecret" validate:"required"`
 	AllowedOrigins     []string       `json:"allowedOrigins" validate:"required"`
 	ShutdownTimeout    time.Duration  `json:"shutdownTimeout" validate:"required"`
 	RateLimitPerMinute int            `json:"rateLimitPerMinute" validate:"required"`

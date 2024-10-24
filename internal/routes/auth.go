@@ -4,12 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
+	"github.com/rohitxdev/go-api-starter/internal/auth"
+	"github.com/rohitxdev/go-api-starter/internal/email"
+	"github.com/rohitxdev/go-api-starter/internal/kv"
 	"github.com/rohitxdev/go-api-starter/internal/repo"
-	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -54,8 +57,12 @@ func (h *Handler) LogOut(c echo.Context) error {
 }
 
 type logInRequest struct {
-	Email    string `form:"email" json:"email" validate:"required,email"`
-	Password string `form:"password" json:"password" validate:"required"`
+	Token string `query:"token"`
+}
+
+type logInResponse struct {
+	response
+	UserId string `json:"userId"`
 }
 
 func (h *Handler) LogIn(c echo.Context) error {
@@ -63,79 +70,86 @@ func (h *Handler) LogIn(c echo.Context) error {
 	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
-	user, err := h.Repo.GetUserByEmail(c.Request().Context(), sanitizeEmail(req.Email))
+	userId, err := auth.ValidateLoginToken(req.Token, h.Config.JwtSecret)
 	if err != nil {
-		return err
+		return c.JSON(http.StatusUnauthorized, response{Message: "Invalid token"})
 	}
-	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		return c.String(http.StatusUnauthorized, err.Error())
-	}
-	if _, err := createSession(c, user.Id); err != nil {
-		return err
-	}
-	return c.String(http.StatusOK, "Logged in successfully")
-}
-
-type signUpRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=8,max=64"`
-}
-
-func (h *Handler) SignUp(c echo.Context) error {
-	req := new(signUpRequest)
-	if err := bindAndValidate(c, req); err != nil {
-		return err
-	}
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), 12)
+	tokenKey := getTokenKey(userId)
+	token, err := h.KVStore.Get(c.Request().Context(), tokenKey)
 	if err != nil {
+		return c.JSON(http.StatusInternalServerError, response{Message: "Invalid token"})
+	}
+	if token != req.Token {
+		return c.JSON(http.StatusUnauthorized, response{Message: "Invalid token"})
+	}
+	if err = h.KVStore.Delete(c.Request().Context(), tokenKey); err != nil {
+		return c.JSON(http.StatusInternalServerError, response{Message: "Internal server error"})
+	}
+	if _, err = createSession(c, userId); err != nil {
 		return err
 	}
-	user := &repo.UserCore{
-		Email:        sanitizeEmail(req.Email),
-		PasswordHash: string(passwordHash),
-	}
-	userId, err := h.Repo.CreateUser(c.Request().Context(), user)
-	if err != nil {
-		fmt.Println(err)
-		return c.String(http.StatusBadRequest, err.Error())
-	}
-	if _, err := createSession(c, userId); err != nil {
-		return err
-	}
-	return c.String(http.StatusCreated, "Signed up successfully")
-}
-
-type changePasswordRequest struct {
-	CurrentPassword string `json:"currentPassword" validate:"required,min=8,max=64"`
-	NewPassword     string `json:"newPassword" validate:"required,min=8,max=64"`
-}
-
-func (h *Handler) ChangePassword(c echo.Context) error {
-	req := new(changePasswordRequest)
-	if err := bindAndValidate(c, req); err != nil {
-		return err
-	}
-	sess, err := session.Get("session", c)
-	if err != nil {
-		return c.String(http.StatusUnauthorized, ErrUserNotLoggedIn.Error())
-	}
-	userId, ok := sess.Values["user_id"].(string)
-	if !ok {
-		return c.String(http.StatusUnauthorized, ErrUserNotLoggedIn.Error())
-	}
-	user, err := h.Repo.GetUserById(c.Request().Context(), userId)
-	if err != nil {
-		return c.String(http.StatusInternalServerError, err.Error())
-	}
-	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.CurrentPassword)); err != nil {
-		return c.String(http.StatusUnauthorized, err.Error())
-	}
-	hash, _ := bcrypt.GenerateFromPassword([]byte(req.NewPassword), 12)
-	err = h.Repo.Update(c.Request().Context(), userId, map[string]any{
-		"password_hash": string(hash),
+	return c.JSON(http.StatusOK, logInResponse{
+		response: response{Message: "Logged in successfully"},
+		UserId:   userId,
 	})
-	if err != nil {
-		return c.String(http.StatusInternalServerError, err.Error())
+}
+
+type sendLoginEmailRequest struct {
+	Email string `form:"email" json:"email" validate:"required,email"`
+}
+
+func (h *Handler) SendLoginEmail(c echo.Context) error {
+	req := new(sendLoginEmailRequest)
+	if err := bindAndValidate(c, req); err != nil {
+		return err
 	}
-	return c.String(http.StatusOK, "Password changed successfully")
+	host := c.Request().Host
+	if host == "" {
+		return c.JSON(http.StatusBadRequest, response{Message: "Host header is empty"})
+	}
+
+	userEmail := sanitizeEmail(req.Email)
+	var userId string
+	user, err := h.Repo.GetUserByEmail(c.Request().Context(), userEmail)
+
+	if err != nil {
+		if !errors.Is(err, repo.ErrUserNotFound) {
+			return c.JSON(http.StatusInternalServerError, response{Message: "Internal server error"})
+		}
+		userId, err = h.Repo.CreateUser(c.Request().Context(), &repo.UserCore{
+			Email: userEmail,
+		})
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, response{Message: "Failed to create user"})
+		}
+	} else {
+		userId = user.Id
+	}
+
+	token, err := auth.GenerateLoginToken(userId, h.Config.JwtSecret)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, response{Message: "Failed to generate login token"})
+	}
+
+	emailHeaders := &email.Headers{
+		Subject:     "Log In to Your Account",
+		ToAddresses: []string{req.Email},
+		FromAddress: h.Config.SenderEmail,
+		FromName:    "The App",
+	}
+	emailData := map[string]any{
+		"loginURL":     fmt.Sprintf("http://%s/v1/auth/log-in?token=%s", host, token),
+		"validMinutes": "5",
+	}
+	if err = h.Email.SendHtml(emailHeaders, "login.tmpl", emailData); err != nil {
+		return c.JSON(http.StatusInternalServerError, response{Message: "Failed to send email"})
+	}
+	if err = h.KVStore.Set(c.Request().Context(), getTokenKey(userId), token, kv.WithExpiry(time.Minute*5)); err != nil {
+		return c.JSON(http.StatusInternalServerError, response{Message: "Failed to set token"})
+	}
+	return c.String(http.StatusOK, "Login link sent to "+req.Email)
+}
+
+func getTokenKey(userId string) string {
+	return "login.token." + userId
 }

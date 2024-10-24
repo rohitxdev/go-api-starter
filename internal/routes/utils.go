@@ -11,16 +11,22 @@ import (
 func bindAndValidate(c echo.Context, i any) error {
 	var err error
 	if err = c.Bind(i); err != nil {
-		_ = c.String(http.StatusInternalServerError, err.Error())
+		_ = c.JSON(http.StatusInternalServerError, response{
+			Message: err.Error(),
+		})
 		return err
 	}
 	binder := echo.DefaultBinder{}
 	if err = binder.BindHeaders(c, i); err != nil {
-		_ = c.String(http.StatusInternalServerError, err.Error())
+		_ = c.JSON(http.StatusInternalServerError, response{
+			Message: err.Error(),
+		})
 		return err
 	}
 	if err = c.Validate(i); err != nil {
-		_ = c.String(http.StatusUnprocessableEntity, err.Error())
+		_ = c.JSON(http.StatusUnprocessableEntity, response{
+			Message: err.Error(),
+		})
 		return err
 	}
 	return err
@@ -41,4 +47,8 @@ func sanitizeEmail(email string) string {
 func accepts(c echo.Context) string {
 	acceptedTypes := strings.Split(c.Request().Header.Get("Accept"), ",")
 	return acceptedTypes[0]
+}
+
+type response struct {
+	Message string `json:"message"`
 }

@@ -82,12 +82,12 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		echo.TrustPrivateNet(false), // e.g. ipv4 start with 10. or 192.168
 	)
 
-	templates, err := template.ParseFS(h.FileSystem, "web/templates/**/*.tmpl")
+	pageTemplates, err := template.ParseFS(h.FileSystem, "web/templates/pages/*.tmpl")
 	if err != nil {
 		return nil, fmt.Errorf("could not parse templates: %w", err)
 	}
 	e.Renderer = customRenderer{
-		templates: templates,
+		templates: pageTemplates,
 	}
 
 	setUpMiddleware(e, h)
@@ -100,7 +100,9 @@ func setUpMiddleware(e *echo.Echo, h *Handler) {
 	e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: h.Config.AllowedOrigins,
 	}))
-	e.Pre(middleware.CSRF())
+	if !h.Config.IsDev {
+		e.Pre(middleware.CSRF())
+	}
 	if h.Config.RateLimitPerMinute > 0 {
 		e.Pre(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
 			Store: middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
@@ -159,7 +161,7 @@ func setUpMiddleware(e *echo.Echo, h *Handler) {
 					slog.Duration("durationMs", time.Duration(v.Latency.Milliseconds())),
 				),
 				slog.Group("response",
-					slog.Int("status", v.Status),
+					slog.Int("statusCode", v.Status),
 					slog.Int64("sizeBytes", v.ResponseSize),
 				),
 				slog.String("userId", userId),
@@ -207,10 +209,9 @@ func setUpRoutes(e *echo.Echo, h *Handler) {
 	{
 		auth := v1.Group("/auth")
 		{
-			auth.POST("/sign-up", h.SignUp)
-			auth.POST("/log-in", h.LogIn)
+			auth.GET("/log-in", h.LogIn)
+			auth.POST("/send-log-in-email", h.SendLoginEmail)
 			auth.POST("/log-out", h.LogOut)
-			auth.POST("/change-password", h.ChangePassword)
 		}
 	}
 }

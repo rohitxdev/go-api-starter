@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/oklog/ulid/v2"
 )
 
 type prefix uint8
@@ -24,19 +24,15 @@ var prefixes = map[prefix]string{
 }
 
 func New(prefix prefix) string {
-	id, err := uuid.NewV7()
-	if err != nil {
-		panic(fmt.Sprintf("create %d id", prefix))
-	}
+	id := ulid.Make()
 	return prefixes[prefix] + "_" + id.String()
 }
 
 func Time(id string) (time.Time, error) {
 	id = strings.Split(id, "_")[1]
-	uid, err := uuid.Parse(id)
+	uid, err := ulid.Parse(id)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, fmt.Errorf("could not parse ulid: %w", err)
 	}
-	return time.Unix(uid.Time().UnixTime()), nil
-
+	return time.UnixMilli(int64(uid.Time())), nil
 }

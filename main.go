@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"text/template"
 	"time"
 
 	"github.com/rohitxdev/go-api-starter/internal/blobstore"
@@ -100,11 +101,22 @@ func main() {
 		panic("could not connect to s3 client: " + err.Error())
 	}
 
+	emailTemplates, err := template.ParseFS(fileSystem, "web/templates/emails/*.tmpl")
+	if err != nil {
+		panic("could not parse email templates: " + err.Error())
+	}
+	emailClient := email.New(&email.SmtpCredentials{
+		Host:     c.SmtpHost,
+		Port:     c.SmtpPort,
+		Username: c.SmtpUsername,
+		Password: c.SmtpPassword,
+	}, emailTemplates)
+
 	h := routes.NewHandler(&routes.Dependencies{
 		Config:     c,
 		KVStore:    kv,
 		Repo:       r,
-		Email:      &email.Client{},
+		Email:      emailClient,
 		BlobStore:  s3Client,
 		FileSystem: &fileSystem,
 	})
