@@ -82,6 +82,16 @@ func (h *Handler) LogIn(c echo.Context) error {
 	if token != req.Token {
 		return c.JSON(http.StatusUnauthorized, response{Message: "Invalid token"})
 	}
+
+	user, err := h.Repo.GetUserById(c.Request().Context(), userId)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, response{Message: "Internal server error"})
+	}
+	if !user.IsVerified {
+		if err = h.Repo.SetIsVerified(c.Request().Context(), user.Id, true); err != nil {
+			return c.JSON(http.StatusInternalServerError, response{Message: "Internal server error"})
+		}
+	}
 	if err = h.KVStore.Delete(c.Request().Context(), tokenKey); err != nil {
 		return c.JSON(http.StatusInternalServerError, response{Message: "Internal server error"})
 	}
@@ -116,9 +126,7 @@ func (h *Handler) SendLoginEmail(c echo.Context) error {
 		if !errors.Is(err, repo.ErrUserNotFound) {
 			return c.JSON(http.StatusInternalServerError, response{Message: "Internal server error"})
 		}
-		userId, err = h.Repo.CreateUser(c.Request().Context(), &repo.UserCore{
-			Email: userEmail,
-		})
+		userId, err = h.Repo.CreateUser(c.Request().Context(), userEmail)
 		if err != nil {
 			return c.JSON(http.StatusInternalServerError, response{Message: "Failed to create user"})
 		}

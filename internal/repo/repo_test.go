@@ -59,11 +59,7 @@ func TestRepo(t *testing.T) {
 	assert.Nil(t, err)
 
 	t.Run("Create user", func(t *testing.T) {
-		user := repo.UserCore{
-			Email:        "test@test.com",
-			PasswordHash: "testpassword",
-		}
-		id, err := r.CreateUser(ctx, &user)
+		id, err := r.CreateUser(ctx, "test@test.com")
 		assert.Nil(t, err)
 		assert.NotEqual(t, id, "")
 	})
