@@ -3,6 +3,7 @@ package repo
 
 import (
 	"database/sql"
+	"log/slog"
 )
 
 type Repo struct {
@@ -27,13 +28,18 @@ func (repo *Repo) up() error {
 	if _, err := repo.db.Exec("CREATE EXTENSION IF NOT EXISTS CITEXT;"); err != nil {
 		return err
 	}
-	_, err := repo.db.Exec(`
-	CREATE TABLE IF NOT EXISTS users(
+
+	var exists bool
+	if err := repo.db.QueryRow("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users');").Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		_, err := repo.db.Exec(`
+	CREATE TABLE users(
     	id TEXT PRIMARY KEY,
 		role TEXT CHECK (role IN ('user', 'admin')) DEFAULT 'user',
     	email CITEXT NOT NULL UNIQUE CHECK (LENGTH(email)<=64),
-		username TEXT UNIQUE CHECK (LENGTH(username)<=32) DEFAULT '',
-    	full_name TEXT CHECK (LENGTH(full_name)<=64) DEFAULT '',
+    	full_name TEXT NOT NULL CHECK (LENGTH(full_name)<=64) DEFAULT '',
     	date_of_birth DATE,
     	gender TEXT CHECK (gender IN ('male', 'female', 'other')),
 		phone_number TEXT CHECK (LENGTH(phone_number)<=16),
@@ -44,8 +50,10 @@ func (repo *Repo) up() error {
     	updated_at TIMESTAMPTZ DEFAULT current_timestamp
 	);
 	`)
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
+		slog.Info("Created table 'users'")
 	}
-	return err
+	return nil
 }

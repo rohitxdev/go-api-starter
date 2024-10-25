@@ -17,7 +17,7 @@ func (h *Handler) GetFile(c echo.Context) error {
 	}
 	presignedReq, err := h.BlobStore.PresignGetObject(c.Request().Context(), h.Config.S3BucketName, req.FileName)
 	if err != nil {
-		return c.String(http.StatusInternalServerError, err.Error())
+		return err
 	}
 	return c.JSON(http.StatusOK, presignedReq)
 }
@@ -33,17 +33,17 @@ func (h *Handler) PutFile(c echo.Context) error {
 	}
 	file, err := c.FormFile("file")
 	if err != nil {
-		return c.String(http.StatusInternalServerError, err.Error())
+		return err
 	}
 	f, err := file.Open()
 	if err != nil {
-		return c.String(http.StatusInternalServerError, err.Error())
+		return err
 	}
 	defer f.Close()
 	// fileContent, err := io.ReadAll(f)
 	// err = h.fs.Upload(c.Request().Context(), h.config.S3BucketName, file.Filename, fileContent)
 	// if err != nil {
-	// 	return c.String(http.StatusInternalServerError, err.Error())
+	// 	return unexpectedError(c,err)
 	// }
 	return c.NoContent(http.StatusOK)
 }
@@ -51,7 +51,7 @@ func (h *Handler) PutFile(c echo.Context) error {
 func (h *Handler) GetFileList(c echo.Context) error {
 	files, err := h.BlobStore.GetList(c.Request().Context(), h.Config.S3BucketName, "")
 	if err != nil {
-		return c.String(http.StatusInternalServerError, err.Error())
+		return err
 	}
 	return c.JSON(http.StatusOK, files)
 }

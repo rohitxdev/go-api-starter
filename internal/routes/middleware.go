@@ -19,23 +19,23 @@ var roleMap = map[string]role{
 	"admin": RoleAdmin,
 }
 
-func (h *Handler) RequiresAuth(role role) echo.MiddlewareFunc {
+func (h *Handler) RestrictTo(role role) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			sess, err := session.Get("session", c)
 			if err != nil {
-				return c.String(http.StatusUnauthorized, err.Error())
+				return echo.NewHTTPError(http.StatusUnauthorized, err)
 			}
-			userId, ok := sess.Values["user_id"].(string)
+			userId, ok := sess.Values["userId"].(string)
 			if !ok {
-				return c.String(http.StatusUnauthorized, "invalid session")
+				return echo.ErrUnauthorized
 			}
 			user, err := h.Repo.GetUserById(c.Request().Context(), userId)
 			if err != nil {
-				return c.String(http.StatusUnauthorized, err.Error())
+				return echo.NewHTTPError(http.StatusUnauthorized, err)
 			}
 			if roleMap[user.Role] < role {
-				return c.String(http.StatusForbidden, "forbidden")
+				return echo.ErrForbidden
 			}
 			c.Set("user", user)
 			return next(c)

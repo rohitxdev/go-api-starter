@@ -16,34 +16,16 @@ import (
 )
 
 const (
-	sessionMaxAge = 86400 * 30 // 30 days
+	logInTokenExpiresIn = time.Minute * 10 // 10 minutes
 )
-
-var (
-	ErrUserNotLoggedIn = errors.New("user is not logged in")
-)
-
-func createSession(c echo.Context, userId string) (*sessions.Session, error) {
-	sess, err := session.Get("session", c)
-	if err != nil {
-		return nil, err
-	}
-	sess.Options = &sessions.Options{
-		Path:     "/",
-		MaxAge:   sessionMaxAge,
-		HttpOnly: true,
-	}
-	sess.Values["user_id"] = userId
-	if err := sess.Save(c.Request(), c.Response()); err != nil {
-		return nil, err
-	}
-	return sess, nil
-}
 
 func (h *Handler) LogOut(c echo.Context) error {
 	sess, err := session.Get("session", c)
 	if err != nil {
-		return c.String(http.StatusBadRequest, ErrUserNotLoggedIn.Error())
+		return err
+	}
+	if sess.IsNew {
+		return echo.NewHTTPError(http.StatusBadRequest, "User is not logged in")
 	}
 	sess.Options = &sessions.Options{
 		Path:     "/",
@@ -53,11 +35,11 @@ func (h *Handler) LogOut(c echo.Context) error {
 	if err := sess.Save(c.Request(), c.Response()); err != nil {
 		return err
 	}
-	return c.String(http.StatusOK, "Logged out")
+	return c.JSON(http.StatusOK, response{Message: "Logged out successfully"})
 }
 
 type logInRequest struct {
-	Token string `query:"token"`
+	Token string `query:"token" validate:"required"`
 }
 
 type logInResponse struct {
@@ -65,35 +47,35 @@ type logInResponse struct {
 	UserId string `json:"userId"`
 }
 
-func (h *Handler) LogIn(c echo.Context) error {
+func (h *Handler) ValidateLogInToken(c echo.Context) error {
 	req := new(logInRequest)
 	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
 	userId, err := auth.ValidateLoginToken(req.Token, h.Config.JwtSecret)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, response{Message: "Invalid token"})
+		return echo.NewHTTPError(http.StatusUnauthorized, "Invalid token")
 	}
-	tokenKey := getTokenKey(userId)
+	tokenKey := getLogInTokenKey(userId)
 	token, err := h.KVStore.Get(c.Request().Context(), tokenKey)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, response{Message: "Invalid token"})
+		return echo.NewHTTPError(http.StatusUnauthorized, "Invalid token")
 	}
 	if token != req.Token {
-		return c.JSON(http.StatusUnauthorized, response{Message: "Invalid token"})
+		return echo.NewHTTPError(http.StatusUnauthorized, "Invalid token")
 	}
 
 	user, err := h.Repo.GetUserById(c.Request().Context(), userId)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, response{Message: "Internal server error"})
+		return err
 	}
 	if !user.IsVerified {
 		if err = h.Repo.SetIsVerified(c.Request().Context(), user.Id, true); err != nil {
-			return c.JSON(http.StatusInternalServerError, response{Message: "Internal server error"})
+			return err
 		}
 	}
 	if err = h.KVStore.Delete(c.Request().Context(), tokenKey); err != nil {
-		return c.JSON(http.StatusInternalServerError, response{Message: "Internal server error"})
+		return err
 	}
 	if _, err = createSession(c, userId); err != nil {
 		return err
@@ -115,7 +97,7 @@ func (h *Handler) SendLoginEmail(c echo.Context) error {
 	}
 	host := c.Request().Host
 	if host == "" {
-		return c.JSON(http.StatusBadRequest, response{Message: "Host header is empty"})
+		return echo.NewHTTPError(http.StatusBadRequest, "Host header is empty")
 	}
 
 	userEmail := sanitizeEmail(req.Email)
@@ -124,11 +106,11 @@ func (h *Handler) SendLoginEmail(c echo.Context) error {
 
 	if err != nil {
 		if !errors.Is(err, repo.ErrUserNotFound) {
-			return c.JSON(http.StatusInternalServerError, response{Message: "Internal server error"})
+			return fmt.Errorf("Failed to get user: %w", err)
 		}
 		userId, err = h.Repo.CreateUser(c.Request().Context(), userEmail)
 		if err != nil {
-			return c.JSON(http.StatusInternalServerError, response{Message: "Failed to create user"})
+			return fmt.Errorf("Failed to create user: %w", err)
 		}
 	} else {
 		userId = user.Id
@@ -136,7 +118,7 @@ func (h *Handler) SendLoginEmail(c echo.Context) error {
 
 	token, err := auth.GenerateLoginToken(userId, h.Config.JwtSecret)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, response{Message: "Failed to generate login token"})
+		return fmt.Errorf("Failed to generate login token: %w", err)
 	}
 
 	emailHeaders := &email.Headers{
@@ -145,19 +127,23 @@ func (h *Handler) SendLoginEmail(c echo.Context) error {
 		FromAddress: h.Config.SenderEmail,
 		FromName:    "The App",
 	}
+	protocol := "http"
+	if c.IsTLS() {
+		protocol = "https"
+	}
 	emailData := map[string]any{
-		"loginURL":     fmt.Sprintf("http://%s/v1/auth/log-in?token=%s", host, token),
-		"validMinutes": "5",
+		"loginURL":     fmt.Sprintf("%s://%s%s?token=%s", protocol, host, c.Path(), token),
+		"validMinutes": uint(logInTokenExpiresIn.Minutes()),
 	}
 	if err = h.Email.SendHtml(emailHeaders, "login.tmpl", emailData); err != nil {
-		return c.JSON(http.StatusInternalServerError, response{Message: "Failed to send email"})
+		return fmt.Errorf("Failed to send email: %w", err)
 	}
-	if err = h.KVStore.Set(c.Request().Context(), getTokenKey(userId), token, kv.WithExpiry(time.Minute*5)); err != nil {
-		return c.JSON(http.StatusInternalServerError, response{Message: "Failed to set token"})
+	if err = h.KVStore.Set(c.Request().Context(), getLogInTokenKey(userId), token, kv.WithExpiry(logInTokenExpiresIn)); err != nil {
+		return fmt.Errorf("Failed to set token: %w", err)
 	}
-	return c.String(http.StatusOK, "Login link sent to "+req.Email)
+	return c.JSON(http.StatusOK, response{Message: "Login link sent to " + req.Email})
 }
 
-func getTokenKey(userId string) string {
+func getLogInTokenKey(userId string) string {
 	return "login.token." + userId
 }

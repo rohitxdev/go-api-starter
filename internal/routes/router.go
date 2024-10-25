@@ -202,16 +202,20 @@ func setUpRoutes(e *echo.Echo, h *Handler) {
 	}))
 	e.GET("/ping", h.GetPing)
 	e.GET("/config", h.GetConfig)
-	e.GET("/_", h.GetAdmin, h.RequiresAuth(RoleAdmin))
+	e.GET("/me", h.GetMe, h.RestrictTo(RoleUser))
+	e.GET("/_", h.GetAdmin, h.RestrictTo(RoleAdmin))
 	e.GET("/", h.GetHome)
 
 	v1 := e.Group("/v1")
 	{
 		auth := v1.Group("/auth")
 		{
-			auth.GET("/log-in", h.LogIn)
-			auth.POST("/send-log-in-email", h.SendLoginEmail)
-			auth.POST("/log-out", h.LogOut)
+			logIn := auth.Group("/log-in")
+			{
+				logIn.GET("", h.ValidateLogInToken)
+				logIn.POST("", h.SendLoginEmail)
+			}
+			auth.GET("/log-out", h.LogOut)
 		}
 	}
 }

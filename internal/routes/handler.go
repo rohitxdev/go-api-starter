@@ -74,3 +74,17 @@ func (h *Handler) GetConfig(c echo.Context) error {
 func (h *Handler) GetAdmin(c echo.Context) error {
 	return c.String(http.StatusOK, "Admin page")
 }
+
+// @Summary Get user
+// @Description Get user.
+// @Security ApiKeyAuth
+// @Router /me [get]
+// @Success 200 {object} repo.User
+// @Failure 401 {string} string "invalid session"
+func (h *Handler) GetMe(c echo.Context) error {
+	user := getUser(c)
+	if user == nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "User is not logged in")
+	}
+	return c.JSON(http.StatusOK, user)
+}
