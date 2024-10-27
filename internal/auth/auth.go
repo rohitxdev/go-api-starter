@@ -7,36 +7,41 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func GenerateLoginToken(userId string, jwtSecret string) (string, error) {
+// GenerateLoginToken generates a login token for the user id.
+func GenerateLoginToken(userId uint64, jwtSecret string, expiresIn time.Duration) (string, error) {
 	claims := jwt.MapClaims{
 		"userId": userId,
 		"nbf":    time.Now().Unix(),
-		"exp":    time.Now().Add(5 * time.Minute).Unix(),
+		"exp":    time.Now().Add(expiresIn).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(jwtSecret))
+	tokenStr, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
-		return "", fmt.Errorf("could not generate login token: %w", err)
+		return "", fmt.Errorf("Failed to generate login token: %w", err)
 	}
-	return tokenString, nil
+	return tokenStr, nil
 }
 
-func ValidateLoginToken(tokenStr string, jwtSecret string) (string, error) {
+// ValidateLoginToken validates the login token and returns the user id.
+func ValidateLoginToken(tokenStr string, jwtSecret string) (uint64, error) {
 	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 		}
 		return []byte(jwtSecret), nil
 	})
 	if err != nil {
-		return "", fmt.Errorf("could not validate login token: %w", err)
+		return 0, fmt.Errorf("Failed to validate login token: %w", err)
 	}
-	if claims, ok := token.Claims.(jwt.MapClaims); ok {
-		userId, ok := claims["userId"].(string)
-		if !ok {
-			return "", fmt.Errorf("could not validate login token: userId is not a string")
-		}
-		return userId, nil
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return 0, fmt.Errorf("Failed to validate login token: invalid claims")
 	}
-	return "", fmt.Errorf("could not validate login token: invalid claims")
+
+	userId, ok := claims["userId"].(uint64)
+	if !ok {
+		return 0, fmt.Errorf("Failed to validate login token: userId is not of type uint64")
+	}
+	return userId, nil
 }

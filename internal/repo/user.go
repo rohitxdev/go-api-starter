@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
-	"github.com/rohitxdev/go-api-starter/internal/id"
 )
 
 var (
@@ -26,11 +25,11 @@ type User struct {
 	ImageUrl      string `json:"image_url"`
 	CreatedAt     string `json:"created_at"`
 	UpdatedAt     string `json:"updated_at"`
-	Id            string `json:"id"`
+	Id            uint64 `json:"id"`
 	IsVerified    bool   `json:"is_verified"`
 }
 
-func (repo *Repo) GetUserById(ctx context.Context, userId string) (*User, error) {
+func (repo *Repo) GetUserById(ctx context.Context, userId uint64) (*User, error) {
 	user := new(User)
 	err := repo.db.QueryRowContext(ctx, `SELECT id, role, email, COALESCE(full_name, ''), COALESCE(date_of_birth, '-infinity'), COALESCE(gender, ''), COALESCE(phone_number, ''), COALESCE(account_status, ''), COALESCE(image_url, ''), is_verified, created_at, updated_at FROM users WHERE id=$1 LIMIT 1;`, userId).Scan(&user.Id, &user.Role, &user.Email, &user.FullName, &user.DateOfBirth, &user.Gender, &user.PhoneNumber, &user.AccountStatus, &user.ImageUrl, &user.IsVerified, &user.CreatedAt, &user.UpdatedAt)
 
@@ -72,11 +71,11 @@ func (repo *Repo) GetUserByEmail(ctx context.Context, email string) (*User, erro
 	return user, nil
 }
 
-func (repo *Repo) CreateUser(ctx context.Context, email string) (string, error) {
-	userId := id.New(id.User)
-	err := repo.db.QueryRowContext(ctx, `INSERT INTO users(id, email) VALUES($1, $2) RETURNING id;`, userId, email).Scan(&userId)
+func (repo *Repo) CreateUser(ctx context.Context, email string) (uint64, error) {
+	var userId uint64
+	err := repo.db.QueryRowContext(ctx, `INSERT INTO users(email) VALUES($1) RETURNING id;`, email).Scan(&userId)
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 	return userId, nil
 }
@@ -101,7 +100,7 @@ func (repo *Repo) Update(ctx context.Context, id string, updates map[string]any)
 	return err
 }
 
-func (r *Repo) SetIsVerified(ctx context.Context, id string, isVerified bool) error {
+func (r *Repo) SetIsVerified(ctx context.Context, id uint64, isVerified bool) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE users SET is_verified=$1 WHERE id=$2;`, isVerified, id)
 	return err
 }

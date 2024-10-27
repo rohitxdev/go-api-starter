@@ -1,5 +1,5 @@
 bin
-db
+.local
 tmp
 .tmp
 *.env*

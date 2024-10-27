@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rohitxdev/go-api-starter/internal/database"
 	"github.com/rohitxdev/go-api-starter/internal/kv"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,9 +18,8 @@ func TestKVStore(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Create KV store", func(t *testing.T) {
-		db, err := database.NewSqlite(kvName)
-		assert.Nil(t, err)
-		kvstore, err = kv.New(db, time.Second*10)
+		var err error
+		kvstore, err = kv.New(kvName, time.Second*10)
 		assert.Nil(t, err)
 	})
 

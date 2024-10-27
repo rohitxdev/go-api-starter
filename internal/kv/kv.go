@@ -4,8 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
+
+	"github.com/rohitxdev/go-api-starter/internal/database"
 )
 
 var (
@@ -20,7 +23,11 @@ type Store struct {
 	cancel context.CancelFunc
 }
 
-func New(db *sql.DB, purgeFreq time.Duration) (*Store, error) {
+func New(dbName string, purgeFreq time.Duration) (*Store, error) {
+	db, err := database.NewSqlite(dbName)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create kv store: %w", err)
+	}
 	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS kv_store (
 			key TEXT PRIMARY KEY, 

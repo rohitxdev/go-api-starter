@@ -72,14 +72,8 @@ func main() {
 	}()
 	slog.Debug("Connected to database")
 
-	//Connect to sqlite database
-	sqliteDb, err := database.NewSqlite(":memory:")
-	if err != nil {
-		panic("could not connect to sqlite database: " + err.Error())
-	}
-
 	//Connect to kv store
-	kv, err := kv.New(sqliteDb, time.Minute*5)
+	kv, err := kv.New(":memory:", time.Minute*5)
 	if err != nil {
 		panic("could not connect to kv store: " + err.Error())
 	}

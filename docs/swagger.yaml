@@ -11,6 +11,33 @@ definitions:
     required:
     - env
     type: object
+  repo.User:
+    properties:
+      account_status:
+        type: string
+      created_at:
+        type: string
+      date_of_birth:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      gender:
+        type: string
+      id:
+        type: integer
+      image_url:
+        type: string
+      is_verified:
+        type: boolean
+      phone_number:
+        type: string
+      role:
+        type: string
+      updated_at:
+        type: string
+    type: object
 info:
   contact: {}
 paths:
@@ -47,6 +74,21 @@ paths:
           schema:
             $ref: '#/definitions/config.Client'
       summary: Get config
+  /me:
+    get:
+      description: Get user.
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repo.User'
+        "401":
+          description: invalid session
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Get user
   /ping:
     get:
       description: Ping the server.

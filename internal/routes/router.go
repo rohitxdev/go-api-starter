@@ -140,7 +140,7 @@ func setUpMiddleware(e *echo.Echo, h *Handler) {
 		LogError:         true,
 		LogContentLength: true,
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			var userId string
+			var userId uint64
 			user, ok := c.Get("user").(*repo.User)
 			if ok && (user != nil) {
 				userId = user.Id
@@ -164,7 +164,7 @@ func setUpMiddleware(e *echo.Echo, h *Handler) {
 					slog.Int("statusCode", v.Status),
 					slog.Int64("sizeBytes", v.ResponseSize),
 				),
-				slog.String("userId", userId),
+				slog.Uint64("userId", userId),
 				slog.Any("error", v.Error),
 			)
 

@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	dirName = "db"
+	dirName = ".local"
 )
 
 func createDirIfNotExists(path string) error {

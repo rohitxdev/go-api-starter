@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/sessions"
@@ -44,7 +45,7 @@ type logInRequest struct {
 
 type logInResponse struct {
 	response
-	UserId string `json:"userId"`
+	UserID uint64 `json:"userId"`
 }
 
 func (h *Handler) ValidateLogInToken(c echo.Context) error {
@@ -52,11 +53,11 @@ func (h *Handler) ValidateLogInToken(c echo.Context) error {
 	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
-	userId, err := auth.ValidateLoginToken(req.Token, h.Config.JwtSecret)
+	userID, err := auth.ValidateLoginToken(req.Token, h.Config.JwtSecret)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, "Invalid token")
 	}
-	tokenKey := getLogInTokenKey(userId)
+	tokenKey := getLogInTokenKey(userID)
 	token, err := h.KVStore.Get(c.Request().Context(), tokenKey)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, "Invalid token")
@@ -65,7 +66,7 @@ func (h *Handler) ValidateLogInToken(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "Invalid token")
 	}
 
-	user, err := h.Repo.GetUserById(c.Request().Context(), userId)
+	user, err := h.Repo.GetUserById(c.Request().Context(), userID)
 	if err != nil {
 		return err
 	}
@@ -77,12 +78,12 @@ func (h *Handler) ValidateLogInToken(c echo.Context) error {
 	if err = h.KVStore.Delete(c.Request().Context(), tokenKey); err != nil {
 		return err
 	}
-	if _, err = createSession(c, userId); err != nil {
+	if _, err = createSession(c, userID); err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, logInResponse{
 		response: response{Message: "Logged in successfully"},
-		UserId:   userId,
+		UserID:   userID,
 	})
 }
 
@@ -101,22 +102,22 @@ func (h *Handler) SendLoginEmail(c echo.Context) error {
 	}
 
 	userEmail := sanitizeEmail(req.Email)
-	var userId string
+	var userID uint64
 	user, err := h.Repo.GetUserByEmail(c.Request().Context(), userEmail)
 
 	if err != nil {
 		if !errors.Is(err, repo.ErrUserNotFound) {
 			return fmt.Errorf("Failed to get user: %w", err)
 		}
-		userId, err = h.Repo.CreateUser(c.Request().Context(), userEmail)
+		userID, err = h.Repo.CreateUser(c.Request().Context(), userEmail)
 		if err != nil {
 			return fmt.Errorf("Failed to create user: %w", err)
 		}
 	} else {
-		userId = user.Id
+		userID = user.Id
 	}
 
-	token, err := auth.GenerateLoginToken(userId, h.Config.JwtSecret)
+	token, err := auth.GenerateLoginToken(userID, h.Config.JwtSecret, logInTokenExpiresIn)
 	if err != nil {
 		return fmt.Errorf("Failed to generate login token: %w", err)
 	}
@@ -138,12 +139,12 @@ func (h *Handler) SendLoginEmail(c echo.Context) error {
 	if err = h.Email.SendHtml(emailHeaders, "login.tmpl", emailData); err != nil {
 		return fmt.Errorf("Failed to send email: %w", err)
 	}
-	if err = h.KVStore.Set(c.Request().Context(), getLogInTokenKey(userId), token, kv.WithExpiry(logInTokenExpiresIn)); err != nil {
+	if err = h.KVStore.Set(c.Request().Context(), getLogInTokenKey(userID), token, kv.WithExpiry(logInTokenExpiresIn)); err != nil {
 		return fmt.Errorf("Failed to set token: %w", err)
 	}
 	return c.JSON(http.StatusOK, response{Message: "Login link sent to " + req.Email})
 }
 
-func getLogInTokenKey(userId string) string {
-	return "login.token." + userId
+func getLogInTokenKey(userID uint64) string {
+	return "login.token." + strconv.FormatUint(userID, 10)
 }

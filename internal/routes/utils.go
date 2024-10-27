@@ -51,7 +51,7 @@ type response struct {
 	Message string `json:"message"`
 }
 
-func createSession(c echo.Context, userId string) (*sessions.Session, error) {
+func createSession(c echo.Context, userId uint64) (*sessions.Session, error) {
 	sess, err := session.Get("session", c)
 	if err != nil {
 		return nil, err

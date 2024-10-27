@@ -26,15 +26,15 @@ func (h *Handler) RestrictTo(role role) echo.MiddlewareFunc {
 			if err != nil {
 				return echo.NewHTTPError(http.StatusUnauthorized, err)
 			}
-			userId, ok := sess.Values["userId"].(string)
+			userID, ok := sess.Values["userId"].(uint64)
 			if !ok {
 				return echo.ErrUnauthorized
 			}
-			user, err := h.Repo.GetUserById(c.Request().Context(), userId)
+			user, err := h.Repo.GetUserById(c.Request().Context(), userID)
 			if err != nil {
 				return echo.NewHTTPError(http.StatusUnauthorized, err)
 			}
-			if roleMap[user.Role] < role {
+			if (roleMap[user.Role] < role) || (user.AccountStatus != "active") {
 				return echo.ErrForbidden
 			}
 			c.Set("user", user)
