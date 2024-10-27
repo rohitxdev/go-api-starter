@@ -140,7 +140,7 @@ task_build() {
     fi
 
     print success "Build succesful"
-    print debug "Build id: $build_id"
+    print debug "Build ID: $build_id"
 }
 
 # Run go app build
