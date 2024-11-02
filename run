@@ -100,7 +100,7 @@ task_docker_push() {
 # Run live development server
 task_watch() {
     local tmp_dir=".tmp"
-    local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/internal/config.BuildId=$APP_NAME.$APP_VERSION-dev\" --race -o $tmp_dir/main  ."
+    local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/internal/config.AppName=$APP_NAME -X $PACKAGE_NAME/internal/config.BuildID=$APP_VERSION -X $PACKAGE_NAME/internal/config.BuildType=debug\" --race -o $tmp_dir/main  ."
 
     if ! command -v air &>/dev/null; then
         print loading "Installing air..."
@@ -115,9 +115,9 @@ task_watch() {
 readonly build_path="./bin/main"
 # Build go app for production release and generate OpenAPI docs
 task_build() {
-    local build_id="$APP_NAME.$APP_VERSION"
+    local build_id="$APP_VERSION"
     local build_cmd="CGO_ENABLED=0 go build \
-        -ldflags='-s -w -X $PACKAGE_NAME/internal/config.BuildId=$build_id -extldflags \"-static\"' \
+        -ldflags='-s -w -X $PACKAGE_NAME/internal/config.AppName=$APP_NAME -X $PACKAGE_NAME/internal/config.BuildID=$build_id -X $PACKAGE_NAME/internal/config.BuildType=release -extldflags \"-static\"' \
         --trimpath -o $build_path ."
 
     print loading "Building app..."

@@ -1,41 +1,34 @@
 definitions:
-  config.Client:
-    properties:
-      env:
-        enum:
-        - development
-        - production
-        type: string
-      isDev:
-        type: boolean
-    required:
-    - env
-    type: object
   repo.User:
     properties:
-      account_status:
+      accountStatus:
         type: string
-      created_at:
+      createdAt:
         type: string
-      date_of_birth:
+      dateOfBirth:
         type: string
       email:
         type: string
-      full_name:
+      fullName:
         type: string
       gender:
         type: string
       id:
         type: integer
-      image_url:
+      imageUrl:
         type: string
-      is_verified:
+      isVerified:
         type: boolean
-      phone_number:
+      phoneNumber:
         type: string
       role:
         type: string
-      updated_at:
+      updatedAt:
+        type: string
+    type: object
+  routes.response:
+    properties:
+      message:
         type: string
     type: object
 info:
@@ -72,7 +65,8 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/config.Client'
+            additionalProperties: true
+            type: object
       summary: Get config
   /me:
     get:
@@ -94,8 +88,8 @@ paths:
       description: Ping the server.
       responses:
         "200":
-          description: pong
+          description: OK
           schema:
-            type: string
+            $ref: '#/definitions/routes.response'
       summary: Ping
 swagger: "2.0"

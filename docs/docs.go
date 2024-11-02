@@ -62,7 +62,8 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/config.Client"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -99,9 +100,9 @@ const docTemplate = `{
                 "summary": "Ping",
                 "responses": {
                     "200": {
-                        "description": "pong",
+                        "description": "OK",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/routes.response"
                         }
                     }
                 }
@@ -109,40 +110,22 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "config.Client": {
-            "type": "object",
-            "required": [
-                "env"
-            ],
-            "properties": {
-                "env": {
-                    "type": "string",
-                    "enum": [
-                        "development",
-                        "production"
-                    ]
-                },
-                "isDev": {
-                    "type": "boolean"
-                }
-            }
-        },
         "repo.User": {
             "type": "object",
             "properties": {
-                "account_status": {
+                "accountStatus": {
                     "type": "string"
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
-                "date_of_birth": {
+                "dateOfBirth": {
                     "type": "string"
                 },
                 "email": {
                     "type": "string"
                 },
-                "full_name": {
+                "fullName": {
                     "type": "string"
                 },
                 "gender": {
@@ -151,19 +134,27 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
-                "image_url": {
+                "imageUrl": {
                     "type": "string"
                 },
-                "is_verified": {
+                "isVerified": {
                     "type": "boolean"
                 },
-                "phone_number": {
+                "phoneNumber": {
                     "type": "string"
                 },
                 "role": {
                     "type": "string"
                 },
-                "updated_at": {
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "routes.response": {
+            "type": "object",
+            "properties": {
+                "message": {
                     "type": "string"
                 }
             }

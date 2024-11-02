@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"log/slog"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -17,9 +17,10 @@ import (
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/oklog/ulid/v2"
 	"github.com/rohitxdev/go-api-starter/docs"
-	"github.com/rohitxdev/go-api-starter/internal/id"
 	"github.com/rohitxdev/go-api-starter/internal/repo"
+	"github.com/rs/zerolog"
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"golang.org/x/time/rate"
 )
@@ -66,12 +67,13 @@ func (s customJSONSerializer) Deserialize(c echo.Context, v any) error {
 	return err
 }
 
-func NewRouter(h *Handler) (*echo.Echo, error) {
-	docs.SwaggerInfo.Host = h.Config.Address
+func NewRouter(svc *Services) (*echo.Echo, error) {
+	docs.SwaggerInfo.Host = net.JoinHostPort(svc.Config.Host, svc.Config.Port)
 
 	e := echo.New()
 	e.HideBanner = true
 	e.HidePort = true
+	e.Debug = svc.Config.IsDev
 	e.JSONSerializer = customJSONSerializer{}
 	e.Validator = customValidator{
 		validator: validator.New(),
@@ -82,7 +84,7 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		echo.TrustPrivateNet(false), // e.g. ipv4 start with 10. or 192.168
 	)
 
-	pageTemplates, err := template.ParseFS(h.FileSystem, "web/templates/pages/*.tmpl")
+	pageTemplates, err := template.ParseFS(svc.FileSystem, "web/templates/pages/*.tmpl")
 	if err != nil {
 		return nil, fmt.Errorf("could not parse templates: %w", err)
 	}
@@ -90,42 +92,52 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		templates: pageTemplates,
 	}
 
-	setUpMiddleware(e, h)
-	setUpRoutes(e, h)
+	setUpMiddleware(e, svc)
+	setUpRoutes(e, svc)
 	return e, nil
 }
 
-func setUpMiddleware(e *echo.Echo, h *Handler) {
+func setUpMiddleware(e *echo.Echo, svc *Services) {
 	//Pre-router middlewares
-	e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: h.Config.AllowedOrigins,
-	}))
-	if !h.Config.IsDev {
+	if !svc.Config.IsDev {
 		e.Pre(middleware.CSRF())
 	}
-	if h.Config.RateLimitPerMinute > 0 {
+
+	e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins:                             svc.Config.AllowedOrigins,
+		AllowCredentials:                         true,
+		UnsafeWildcardOriginWithAllowCredentials: svc.Config.IsDev,
+	}))
+
+	if svc.Config.RateLimitPerMinute > 0 {
 		e.Pre(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
 			Store: middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
-				Rate:      rate.Limit(h.Config.RateLimitPerMinute),
+				Rate:      rate.Limit(svc.Config.RateLimitPerMinute),
 				ExpiresIn: time.Minute,
 			})}))
 	}
+
 	e.Pre(middleware.Secure())
+
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
 		Root:       "web/public",
-		Filesystem: http.FS(h.FileSystem),
+		Filesystem: http.FS(svc.FileSystem),
 	}))
+
 	e.Pre(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
 		Timeout: 10 * time.Second, Skipper: func(c echo.Context) bool {
 			return strings.HasPrefix(c.Request().URL.Path, "/debug/pprof")
 		},
 	}))
-	e.Pre(session.Middleware(sessions.NewCookieStore([]byte(h.Config.SessionSecret))))
+
+	e.Pre(session.Middleware(sessions.NewCookieStore([]byte(svc.Config.SessionSecret))))
+
 	e.Pre(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
 		Generator: func() string {
-			return id.New(id.Request)
+			return "req_" + ulid.Make().String()
 		},
 	}))
+
 	e.Pre(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogRequestID:     true,
 		LogRemoteIP:      true,
@@ -146,31 +158,33 @@ func setUpMiddleware(e *echo.Echo, h *Handler) {
 				userId = user.Id
 			}
 
-			slog.InfoContext(
-				c.Request().Context(),
-				"HTTP request",
-				slog.Group("request",
-					slog.String("id", v.RequestID),
-					slog.String("clientIp", v.RemoteIP),
-					slog.String("protocol", v.Protocol),
-					slog.String("uri", v.URI),
-					slog.String("method", v.Method),
-					slog.String("referer", v.Referer),
-					slog.String("userAgent", v.UserAgent),
-					slog.String("contentLength", v.ContentLength),
-					slog.Duration("durationMs", time.Duration(v.Latency.Milliseconds())),
-				),
-				slog.Group("response",
-					slog.Int("statusCode", v.Status),
-					slog.Int64("sizeBytes", v.ResponseSize),
-				),
-				slog.Uint64("userId", userId),
-				slog.Any("error", v.Error),
-			)
+			log := svc.Logger.Info().Ctx(c.Request().Context()).
+				Dict("request", zerolog.Dict().
+					Str("id", v.RequestID).
+					Str("clientIp", v.RemoteIP).
+					Str("protocol", v.Protocol).
+					Str("uri", v.URI).
+					Str("method", v.Method).
+					Str("referer", v.Referer).
+					Str("userAgent", v.UserAgent).
+					Str("contentLength", v.ContentLength).
+					Dur("durationMs", time.Duration(v.Latency.Milliseconds()))).
+				Dict("response", zerolog.Dict().
+					Int("statusCode", v.Status).
+					Int64("sizeBytes", v.ResponseSize))
+
+			if userId != 0 {
+				log = log.Uint64("userId", userId)
+			}
+			if v.Error != nil {
+				log = log.Any("error", v.Error)
+			}
+			log.Msg("HTTP request")
 
 			return nil
 		},
 	}))
+
 	e.Pre(middleware.RemoveTrailingSlash())
 
 	//Post-router middlewares
@@ -179,43 +193,42 @@ func setUpMiddleware(e *echo.Echo, h *Handler) {
 			return !strings.Contains(c.Request().Header.Get("Accept-Encoding"), "gzip") || strings.HasPrefix(c.Path(), "/metrics")
 		},
 	}))
+
 	e.Use(middleware.Decompress())
+
 	e.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
 		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
-			slog.ErrorContext(
-				c.Request().Context(),
-				"panic recover",
-				slog.Any("error", err),
-				slog.Any("stack", string(stack)),
-			)
+			svc.Logger.Error().Ctx(c.Request().Context()).
+				Any("error", err).
+				Any("stack", string(stack)).
+				Msg("HTTP handler panicked")
 			return nil
 		}},
 	))
+
 	e.Use(echoprometheus.NewMiddleware("api"))
+
 	pprof.Register(e)
 }
 
-func setUpRoutes(e *echo.Echo, h *Handler) {
+func setUpRoutes(e *echo.Echo, svc *Services) {
 	e.GET("/metrics", echoprometheus.NewHandler())
 	e.GET("/swagger/*", echoSwagger.EchoWrapHandler(func(c *echoSwagger.Config) {
 		c.SyntaxHighlight = true
 	}))
-	e.GET("/ping", h.GetPing)
-	e.GET("/config", h.GetConfig)
-	e.GET("/me", h.GetMe, h.RestrictTo(RoleUser))
-	e.GET("/_", h.GetAdmin, h.RestrictTo(RoleAdmin))
-	e.GET("/", h.GetHome)
+	e.GET("/ping", GetPing(svc))
+	e.GET("/config", GetConfig(svc))
+	e.GET("/me", GetMe(svc), RestrictTo(svc, RoleUser))
+	e.GET("/_", GetAdmin(svc), RestrictTo(svc, RoleAdmin))
+	e.GET("/", GetHome(svc))
 
-	v1 := e.Group("/v1")
+	auth := e.Group("/auth")
 	{
-		auth := v1.Group("/auth")
+		logIn := auth.Group("/log-in")
 		{
-			logIn := auth.Group("/log-in")
-			{
-				logIn.GET("", h.ValidateLogInToken)
-				logIn.POST("", h.SendLoginEmail)
-			}
-			auth.GET("/log-out", h.LogOut)
+			logIn.GET("", ValidateLogInToken(svc))
+			logIn.POST("", SendLoginEmail(svc))
 		}
+		auth.GET("/log-out", LogOut(svc))
 	}
 }

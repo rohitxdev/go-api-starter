@@ -17,16 +17,16 @@ var (
 type User struct {
 	Email         string `json:"email"`
 	Role          string `json:"role"`
-	FullName      string `json:"full_name,omitempty"`
-	DateOfBirth   string `json:"date_of_birth"`
+	FullName      string `json:"fullName,omitempty"`
+	DateOfBirth   string `json:"dateOfBirth"`
 	Gender        string `json:"gender,omitempty"`
-	PhoneNumber   string `json:"phone_number,omitempty"`
-	AccountStatus string `json:"account_status"`
-	ImageUrl      string `json:"image_url"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
+	PhoneNumber   string `json:"phoneNumber,omitempty"`
+	AccountStatus string `json:"accountStatus"`
+	ImageUrl      string `json:"imageUrl"`
+	CreatedAt     string `json:"createdAt"`
+	UpdatedAt     string `json:"updatedAt"`
 	Id            uint64 `json:"id"`
-	IsVerified    bool   `json:"is_verified"`
+	IsVerified    bool   `json:"isVerified"`
 }
 
 func (repo *Repo) GetUserById(ctx context.Context, userId uint64) (*User, error) {

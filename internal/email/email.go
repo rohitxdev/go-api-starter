@@ -11,7 +11,15 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
-type SmtpCredentials struct {
+type Emailer interface {
+	SendRaw(headers *Headers, mimeType string, body string, attachments ...Attachment) error
+	SendHTML(headers *Headers, templateName string, data map[string]any, attachments ...Attachment) error
+	SendText(headers *Headers, body string, attachments ...Attachment) error
+}
+
+var _ Emailer = (*Client)(nil)
+
+type SMTPCredentials struct {
 	Username string
 	Password string
 	Host     string
@@ -25,23 +33,17 @@ type Client struct {
 }
 
 // New creates a new email client with the provided credentials and templates.
-func New(credentials *SmtpCredentials, templates *template.Template) *Client {
-	dialer := gomail.NewDialer(
-		credentials.Host,
-		credentials.Port,
-		credentials.Username,
-		credentials.Password,
-	)
+func New(c *SMTPCredentials, t *template.Template) *Client {
 	return &Client{
-		dialer:    dialer,
-		templates: templates,
+		dialer:    gomail.NewDialer(c.Host, c.Port, c.Username, c.Password),
+		templates: t,
 	}
 }
 
 type Attachment struct {
-	Filename string
-	MimeType string
-	Data     []byte
+	Filename    string
+	ContentType string
+	Data        []byte
 }
 
 type Headers struct {
@@ -56,7 +58,6 @@ type Headers struct {
 // SendRaw sends an email with raw content of the specified MIME type.
 func (c *Client) SendRaw(headers *Headers, mimeType string, body string, attachments ...Attachment) error {
 	msg := gomail.NewMessage()
-
 	msg.SetHeaders(map[string][]string{
 		"From":    {msg.FormatAddress(headers.FromAddress, headers.FromName)},
 		"Subject": {headers.Subject},
@@ -73,8 +74,8 @@ func (c *Client) SendRaw(headers *Headers, mimeType string, body string, attachm
 	msg.SetBody(mimeType, body)
 
 	for _, attachment := range attachments {
-		if attachment.MimeType == "" {
-			attachment.MimeType = http.DetectContentType(attachment.Data)
+		if attachment.ContentType == "" {
+			attachment.ContentType = http.DetectContentType(attachment.Data)
 		}
 		msg.Attach(
 			attachment.Filename,
@@ -83,7 +84,7 @@ func (c *Client) SendRaw(headers *Headers, mimeType string, body string, attachm
 				return err
 			}),
 			gomail.SetHeader(map[string][]string{
-				"Content-Type": {attachment.MimeType},
+				"Content-Type": {attachment.ContentType},
 			}),
 		)
 	}
@@ -95,7 +96,7 @@ func (c *Client) SendRaw(headers *Headers, mimeType string, body string, attachm
 }
 
 // SendHtml sends an HTML email using a template.
-func (c *Client) SendHtml(headers *Headers, templateName string, data map[string]any, attachments ...Attachment) error {
+func (c *Client) SendHTML(headers *Headers, templateName string, data map[string]any, attachments ...Attachment) error {
 	var buf bytes.Buffer
 	if err := c.templates.ExecuteTemplate(&buf, templateName, data); err != nil {
 		return fmt.Errorf("failed to execute template %q: %w", templateName, err)

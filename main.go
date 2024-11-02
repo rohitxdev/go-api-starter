@@ -6,7 +6,6 @@ import (
 	"embed"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -30,117 +29,106 @@ import (
 var fileSystem embed.FS
 
 func main() {
-	if config.BuildId == "" {
-		panic("build id is not set")
-	}
-
 	if _, err := maxprocs.Set(); err != nil {
-		panic("could not set maxprocs: " + err.Error())
+		panic("Failed to set maxprocs: " + err.Error())
 	}
 
 	//Load config
-	c, err := config.Load()
+	cfg, err := config.Load()
 	if err != nil {
-		panic("could not load config: " + err.Error())
+		panic("Failed to load config: " + err.Error())
 	}
 
 	//Set up logger
-	loggerOpts := logger.HandlerOptions{
-		Level: slog.LevelDebug,
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			if a.Value.String() == "" || a.Value.Equal(slog.AnyValue(nil)) {
-				return slog.Attr{}
-			}
-			return a
-		},
-		NoColor: !c.IsDev,
-	}
-	slog.SetDefault(logger.New(os.Stderr, &loggerOpts))
+	log := logger.New(os.Stderr, cfg.IsDev)
 
-	slog.Debug(fmt.Sprintf("BuildId: %s, Platform: %s/%s, MaxProcs: %d, Env: %s", config.BuildId, runtime.GOOS, runtime.GOARCH, runtime.GOMAXPROCS(0), c.Env))
+	log.Debug().
+		Str("BuildID", cfg.BuildID).
+		Str("BuildType", cfg.BuildType).
+		Str("Platform", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)).
+		Int("MaxProcs", runtime.GOMAXPROCS(0)).
+		Str("Env", cfg.Env).
+		Msg("Running " + cfg.AppName)
 
 	//Connect to postgres database
-	db, err := database.NewPostgres(c.DatabaseUrl)
+	db, err := database.NewPostgres(cfg.DatabaseURL)
 	if err != nil {
-		panic("could not connect to database: " + err.Error())
+		panic("Failed to connect to database: " + err.Error())
 	}
 	defer func() {
 		if err = db.Close(); err != nil {
-			panic("could not close database: " + err.Error())
+			panic("Failed to close database: " + err.Error())
 		}
-		slog.Debug("Database connection closed")
+		log.Debug().Msg("Database connection closed")
 	}()
-	slog.Debug("Connected to database")
+	log.Debug().Msg("Connected to database")
 
-	//Connect to kv store
-	kv, err := kv.New(":memory:", time.Minute*5)
+	//Connect to KV store
+	kv, err := kv.New("kv", time.Minute*5)
 	if err != nil {
-		panic("could not connect to kv store: " + err.Error())
+		panic("Failed to connect to KV store: " + err.Error())
 	}
 	defer func() {
 		kv.Close()
-		slog.Debug("KV store closed")
+		log.Debug().Msg("KV store closed")
 	}()
-	slog.Debug("Connected to KV store")
+	log.Debug().Msg("Connected to KV store")
 
-	//Create API handler
+	// Create repo
 	r, err := repo.New(db)
 	if err != nil {
-		panic("could not create repo: " + err.Error())
+		panic("Failed to create repo: " + err.Error())
 	}
 	defer r.Close()
 
-	s3Client, err := blobstore.New(c.S3Endpoint, c.S3DefaultRegion, c.AwsAccessKeyId, c.AwsAccessKeySecret)
+	bs, err := blobstore.New(cfg.S3Endpoint, cfg.S3DefaultRegion, cfg.AWSAccessKeyID, cfg.AWSAccessKeySecret)
 	if err != nil {
-		panic("could not connect to s3 client: " + err.Error())
+		panic("Failed to connect to S3 client: " + err.Error())
 	}
 
 	emailTemplates, err := template.ParseFS(fileSystem, "web/templates/emails/*.tmpl")
 	if err != nil {
-		panic("could not parse email templates: " + err.Error())
+		panic("Failed to parse email templates: " + err.Error())
 	}
-	emailClient := email.New(&email.SmtpCredentials{
-		Host:     c.SmtpHost,
-		Port:     c.SmtpPort,
-		Username: c.SmtpUsername,
-		Password: c.SmtpPassword,
+	emailClient := email.New(&email.SMTPCredentials{
+		Host:     cfg.SMTPHost,
+		Port:     cfg.SMTPPort,
+		Username: cfg.SMTPUsername,
+		Password: cfg.SMTPPassword,
 	}, emailTemplates)
 
-	h := routes.NewHandler(&routes.Dependencies{
-		Config:     c,
+	e, err := routes.NewRouter(&routes.Services{
+		Config:     cfg,
 		KVStore:    kv,
 		Repo:       r,
 		Email:      emailClient,
-		BlobStore:  s3Client,
+		BlobStore:  bs,
 		FileSystem: &fileSystem,
+		Logger:     log,
 	})
 	if err != nil {
-		panic("could not create handler: " + err.Error())
-	}
-	e, err := routes.NewRouter(h)
-	if err != nil {
-		panic("could not create router: " + err.Error())
+		panic("Failed to create router: " + err.Error())
 	}
 
-	//Start HTTP server
-	ls, err := net.Listen("tcp", c.Address)
+	ls, err := net.Listen("tcp", net.JoinHostPort(cfg.Host, cfg.Port))
 	if err != nil {
-		panic("could not listen on tcp: " + err.Error())
+		panic("Failed to listen on TCP: " + err.Error())
 	}
 	defer func() {
 		if err = ls.Close(); err != nil {
-			panic("could not close tcp listener: " + err.Error())
+			panic("Failed to close TCP listener: " + err.Error())
 		}
 	}()
 
+	//Start HTTP server
 	go func() {
 		if err := http.Serve(ls, e); err != nil && !errors.Is(err, net.ErrClosed) {
-			panic("could not serve http: " + err.Error())
+			panic("Failed to serve HTTP: " + err.Error())
 		}
 	}()
 
-	slog.Debug("HTTP server started")
-	slog.Info(fmt.Sprintf("Server is listening on http://%s and is ready to serve requests", ls.Addr()))
+	log.Debug().Msg("HTTP server started")
+	log.Info().Msg(fmt.Sprintf("Server is listening on http://%s and is ready to serve requests", ls.Addr()))
 
 	//Shut down HTTP server gracefully
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -148,12 +136,12 @@ func main() {
 
 	<-ctx.Done()
 
-	ctx, cancel = context.WithTimeout(context.Background(), c.ShutdownTimeout)
+	ctx, cancel = context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 
 	if err := e.Shutdown(ctx); err != nil {
-		panic("could not shutdown http server: " + err.Error())
+		panic("Failed to shutdown http server: " + err.Error())
 	}
 
-	slog.Debug("HTTP server shut down gracefully")
+	log.Debug().Msg("HTTP server shut down gracefully")
 }

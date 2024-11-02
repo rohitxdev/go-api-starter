@@ -42,13 +42,8 @@ func sanitizeEmail(email string) string {
 	return username + "@" + domain
 }
 
-func accepts(c echo.Context) string {
-	acceptedTypes := strings.Split(c.Request().Header.Get("Accept"), ",")
-	return acceptedTypes[0]
-}
-
 type response struct {
-	Message string `json:"message"`
+	Message string `json:"message,omitempty"`
 }
 
 func createSession(c echo.Context, userId uint64) (*sessions.Session, error) {

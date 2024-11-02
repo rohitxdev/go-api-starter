@@ -46,11 +46,10 @@ func createHttpRequest(opts *httpRequestOpts) (*http.Request, error) {
 func TestRootRoutes(t *testing.T) {
 	cfg, err := config.Load()
 	assert.Nil(t, err)
-	h := routes.NewHandler(&routes.Dependencies{
+	svc := &routes.Services{
 		Config: cfg,
-	})
-	assert.Nil(t, err)
-	e, err := routes.NewRouter(h)
+	}
+	e, err := routes.NewRouter(svc)
 	assert.Nil(t, err)
 
 	t.Run("GET /", func(t *testing.T) {
@@ -61,7 +60,7 @@ func TestRootRoutes(t *testing.T) {
 		assert.Nil(t, err)
 		res := httptest.NewRecorder()
 		c := e.NewContext(req, res)
-		_ = h.GetPing(c)
+		_ = routes.GetHome(svc)(c)
 		assert.Equal(t, http.StatusOK, res.Code)
 	})
 
@@ -73,7 +72,7 @@ func TestRootRoutes(t *testing.T) {
 		assert.Nil(t, err)
 		res := httptest.NewRecorder()
 		c := e.NewContext(req, res)
-		_ = h.GetPing(c)
+		_ = routes.GetHome(svc)(c)
 		assert.Equal(t, http.StatusOK, res.Code)
 		assert.Equal(t, "pong", res.Body.String())
 	})
@@ -86,7 +85,7 @@ func TestRootRoutes(t *testing.T) {
 		assert.Nil(t, err)
 		res := httptest.NewRecorder()
 		c := e.NewContext(req, res)
-		_ = h.GetConfig(c)
+		_ = routes.GetConfig(svc)(c)
 		assert.Equal(t, http.StatusOK, res.Code)
 	})
 }

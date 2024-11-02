@@ -7,12 +7,18 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// GenerateLoginToken generates a login token for the user id.
-func GenerateLoginToken(userId uint64, jwtSecret string, expiresIn time.Duration) (string, error) {
+type TokenClaims struct {
+	ClientID string `json:"clientId"`
+	UserID   uint64 `json:"userId"`
+}
+
+// GenerateLoginToken generates a login token for the claims.
+func GenerateLoginToken(tokenClaims TokenClaims, jwtSecret string, expiresIn time.Duration) (string, error) {
 	claims := jwt.MapClaims{
-		"userId": userId,
-		"nbf":    time.Now().Unix(),
-		"exp":    time.Now().Add(expiresIn).Unix(),
+		"userId":   tokenClaims.UserID,
+		"clientId": tokenClaims.ClientID,
+		"nbf":      time.Now().Unix(),
+		"exp":      time.Now().Add(expiresIn).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenStr, err := token.SignedString([]byte(jwtSecret))
@@ -22,8 +28,8 @@ func GenerateLoginToken(userId uint64, jwtSecret string, expiresIn time.Duration
 	return tokenStr, nil
 }
 
-// ValidateLoginToken validates the login token and returns the user id.
-func ValidateLoginToken(tokenStr string, jwtSecret string) (uint64, error) {
+// ValidateLoginToken validates the login token and returns the claims.
+func ValidateLoginToken(tokenStr string, jwtSecret string) (*TokenClaims, error) {
 	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
@@ -31,17 +37,16 @@ func ValidateLoginToken(tokenStr string, jwtSecret string) (uint64, error) {
 		return []byte(jwtSecret), nil
 	})
 	if err != nil {
-		return 0, fmt.Errorf("Failed to validate login token: %w", err)
+		return nil, fmt.Errorf("Failed to validate login token: %w", err)
 	}
-
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return 0, fmt.Errorf("Failed to validate login token: invalid claims")
+		return nil, fmt.Errorf("Failed to validate login token: invalid claims")
+	}
+	tokenClaims := TokenClaims{
+		UserID:   uint64(claims["userId"].(float64)),
+		ClientID: claims["clientId"].(string),
 	}
 
-	userId, ok := claims["userId"].(uint64)
-	if !ok {
-		return 0, fmt.Errorf("Failed to validate login token: userId is not of type uint64")
-	}
-	return userId, nil
+	return &tokenClaims, nil
 }

@@ -9,7 +9,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.65.2
 	github.com/go-playground/validator v9.31.0+incompatible
 	github.com/go-playground/validator/v10 v10.22.1
-	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/gorilla/sessions v1.4.0
 	github.com/labstack/echo-contrib v0.17.1
@@ -53,6 +52,7 @@ require (
 	github.com/go-openapi/spec v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/context v1.1.2 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
@@ -133,6 +133,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.20.4 // indirect
+	github.com/rs/zerolog v1.33.0
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.30.0 // indirect

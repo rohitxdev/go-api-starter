@@ -30,7 +30,7 @@ func createDirIfNotExists(path string) error {
 	return nil
 }
 
-// Pass :memory: for in-memory database.
+// 'dbName' is the name of the database file. Pass :memory: for in-memory database.
 func NewSqlite(dbName string) (*sql.DB, error) {
 	if dbName != ":memory:" {
 		if err := createDirIfNotExists(dirName); err != nil {
@@ -72,8 +72,9 @@ func NewSqlite(dbName string) (*sql.DB, error) {
 	return db, nil
 }
 
-func NewPostgres(connStr string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", connStr)
+// 'uri' is the connection string and should be in the form of postgres://user:password@host:port/dbname?sslmode=disable&foo=bar
+func NewPostgres(uri string) (*sql.DB, error) {
+	db, err := sql.Open("postgres", uri)
 	if err != nil {
 		return nil, fmt.Errorf("could not open postgres database: %w", err)
 	}
