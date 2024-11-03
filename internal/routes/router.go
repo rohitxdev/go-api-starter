@@ -158,7 +158,7 @@ func setUpMiddleware(e *echo.Echo, svc *Services) {
 				Str("uri", v.URI).
 				Str("method", v.Method).
 				Int64("durationMs", v.Latency.Milliseconds()).
-				Int64("resSizeBytes", v.ResponseSize).
+				Int64("resBytes", v.ResponseSize).
 				Int("status", v.Status).
 				Err(v.Error)
 
