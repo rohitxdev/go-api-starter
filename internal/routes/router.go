@@ -20,7 +20,6 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/rohitxdev/go-api-starter/docs"
 	"github.com/rohitxdev/go-api-starter/internal/repo"
-	"github.com/rs/zerolog"
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"golang.org/x/time/rate"
 )
@@ -139,46 +138,40 @@ func setUpMiddleware(e *echo.Echo, svc *Services) {
 	}))
 
 	e.Pre(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
-		LogRequestID:     true,
-		LogRemoteIP:      true,
-		LogProtocol:      true,
-		LogURI:           true,
-		LogMethod:        true,
-		LogStatus:        true,
-		LogLatency:       true,
-		LogResponseSize:  true,
-		LogReferer:       true,
-		LogUserAgent:     true,
-		LogError:         true,
-		LogContentLength: true,
+		LogRequestID:    true,
+		LogRemoteIP:     true,
+		LogProtocol:     true,
+		LogURI:          true,
+		LogMethod:       true,
+		LogStatus:       true,
+		LogLatency:      true,
+		LogResponseSize: true,
+		LogReferer:      true,
+		LogUserAgent:    true,
+		LogError:        true,
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			var userId uint64
-			user, ok := c.Get("user").(*repo.User)
-			if ok && (user != nil) {
-				userId = user.Id
+			log := svc.Logger.Info().
+				Ctx(c.Request().Context()).
+				Str("id", v.RequestID).
+				Str("ip", v.RemoteIP).
+				Str("protocol", v.Protocol).
+				Str("uri", v.URI).
+				Str("method", v.Method).
+				Int64("durationMs", v.Latency.Milliseconds()).
+				Int64("resSizeBytes", v.ResponseSize).
+				Int("status", v.Status).
+				Err(v.Error)
+
+			if user, ok := c.Get("user").(*repo.User); ok && (user != nil) {
+				log = log.Uint64("userId", user.Id)
+			}
+			if v.UserAgent != "" {
+				log = log.Str("ua", v.UserAgent)
+			}
+			if v.Referer != "" {
+				log = log.Str("referer", v.Referer)
 			}
 
-			log := svc.Logger.Info().Ctx(c.Request().Context()).
-				Dict("request", zerolog.Dict().
-					Str("id", v.RequestID).
-					Str("clientIp", v.RemoteIP).
-					Str("protocol", v.Protocol).
-					Str("uri", v.URI).
-					Str("method", v.Method).
-					Str("referer", v.Referer).
-					Str("userAgent", v.UserAgent).
-					Str("contentLength", v.ContentLength).
-					Dur("durationMs", time.Duration(v.Latency.Milliseconds()))).
-				Dict("response", zerolog.Dict().
-					Int("statusCode", v.Status).
-					Int64("sizeBytes", v.ResponseSize))
-
-			if userId != 0 {
-				log = log.Uint64("userId", userId)
-			}
-			if v.Error != nil {
-				log = log.Any("error", v.Error)
-			}
 			log.Msg("HTTP request")
 
 			return nil
@@ -200,7 +193,10 @@ func setUpMiddleware(e *echo.Echo, svc *Services) {
 		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
 			svc.Logger.Error().Ctx(c.Request().Context()).
 				Any("error", err).
-				Any("stack", string(stack)).
+				Str("stack", string(stack)).
+				Str("method", c.Request().Method).
+				Str("path", c.Path()).
+				Str("ip", c.RealIP()).
 				Msg("HTTP handler panicked")
 			return nil
 		}},

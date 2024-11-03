@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
+# Exit on error
 set -e
+# Export all variables defined below
 set -o allexport
 
 ENV_FILE="${ENV_FILE:-".env"}"
@@ -13,6 +15,7 @@ APP_VERSION="$(git describe --tags --always --dirty)"
 GO_VERSION=$(awk '/^go/ { print $2 }' go.mod)
 BASE_IMAGE_TAG=":$GO_VERSION-alpine3.20"
 
+# Disable exporting of all variables
 set +o allexport
 
 prompt() {
@@ -67,16 +70,16 @@ task_docker_watch() {
     docker compose -f "$compose_file" up --build
 }
 
-repository="$(echo "$PACKAGE_NAME" | cut -d '/' -f 2-)"
-readonly repository
+repo="$(echo "$PACKAGE_NAME" | cut -d '/' -f 2-)"
+readonly repo
 readonly tag="$APP_VERSION"
 # Build docker image for release
 task_docker_build() {
-    if docker images | grep "$repository:$tag" >/dev/null; then
-        docker rmi "$repository:$tag" --force
+    if docker images | grep "$repo:$tag" >/dev/null; then
+        docker rmi "$repo:$tag" --force
     fi
-    docker build --tag "$repository:$tag" --target production --platform linux/amd64 --build-arg BASE_IMAGE_TAG="$BASE_IMAGE_TAG" .
-    print info "Image: $repository:$tag"
+    docker build --tag "$repo:$tag" --target production --platform linux/amd64 --build-arg BASE_IMAGE_TAG="$BASE_IMAGE_TAG" .
+    print info "Image: $repo:$tag"
 }
 
 # Push production docker image to registry
@@ -88,13 +91,13 @@ task_docker_push() {
     if [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_PASSWORD" ]]; then
         docker login --username "$DOCKERHUB_USERNAME" --password-stdin <<<"$DOCKERHUB_PASSWORD"
     fi
-    docker tag "$repository:$tag" "$repository:latest"
-    docker push "$repository:$tag"
-    docker push "$repository:latest"
+    docker tag "$repo:$tag" "$repo:latest"
+    docker push "$repo:$tag"
+    docker push "$repo:latest"
     echo
     print info "The following images were pushed to registry:
-    - $repository:$tag
-    - $repository:latest"
+    - $repo:$tag
+    - $repo:latest"
 }
 
 # Run live development server
