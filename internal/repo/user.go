@@ -15,23 +15,23 @@ var (
 )
 
 type User struct {
-	Email         string `json:"email"`
-	Role          string `json:"role"`
-	FullName      string `json:"fullName,omitempty"`
-	DateOfBirth   string `json:"dateOfBirth"`
-	Gender        string `json:"gender,omitempty"`
-	PhoneNumber   string `json:"phoneNumber,omitempty"`
-	AccountStatus string `json:"accountStatus"`
-	ImageUrl      string `json:"imageUrl"`
-	CreatedAt     string `json:"createdAt"`
-	UpdatedAt     string `json:"updatedAt"`
-	Id            uint64 `json:"id"`
-	IsVerified    bool   `json:"isVerified"`
+	Email         string  `json:"email"`
+	Role          string  `json:"role"`
+	AccountStatus string  `json:"accountStatus"`
+	FullName      *string `json:"fullName,omitempty"`
+	DateOfBirth   *string `json:"dateOfBirth"`
+	Gender        *string `json:"gender,omitempty"`
+	PhoneNumber   *string `json:"phoneNumber,omitempty"`
+	ImageUrl      *string `json:"imageUrl"`
+	CreatedAt     string  `json:"createdAt"`
+	UpdatedAt     string  `json:"updatedAt"`
+	Id            uint64  `json:"id"`
+	IsVerified    bool    `json:"isVerified"`
 }
 
 func (repo *Repo) GetUserById(ctx context.Context, userId uint64) (*User, error) {
-	user := new(User)
-	err := repo.db.QueryRowContext(ctx, `SELECT id, role, email, COALESCE(full_name, ''), COALESCE(date_of_birth, '-infinity'), COALESCE(gender, ''), COALESCE(phone_number, ''), COALESCE(account_status, ''), COALESCE(image_url, ''), is_verified, created_at, updated_at FROM users WHERE id=$1 LIMIT 1;`, userId).Scan(&user.Id, &user.Role, &user.Email, &user.FullName, &user.DateOfBirth, &user.Gender, &user.PhoneNumber, &user.AccountStatus, &user.ImageUrl, &user.IsVerified, &user.CreatedAt, &user.UpdatedAt)
+	var user User
+	err := repo.db.QueryRowContext(ctx, `SELECT id, role, email, full_name, date_of_birth, gender, phone_number, account_status, image_url, is_verified, created_at, updated_at FROM users WHERE id=$1 LIMIT 1;`, userId).Scan(&user.Id, &user.Role, &user.Email, &user.FullName, &user.DateOfBirth, &user.Gender, &user.PhoneNumber, &user.AccountStatus, &user.ImageUrl, &user.IsVerified, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -42,17 +42,17 @@ func (repo *Repo) GetUserById(ctx context.Context, userId uint64) (*User, error)
 			case "undefined_column":
 				return nil, ErrUserNotFound
 			default:
-				return nil, errors.New(code)
+				return nil, fmt.Errorf("Failed to get user by id: %w", err)
 			}
 		}
 		return nil, err
 	}
-	return user, nil
+	return &user, nil
 }
 
 func (repo *Repo) GetUserByEmail(ctx context.Context, email string) (*User, error) {
-	user := new(User)
-	err := repo.db.QueryRowContext(ctx, `SELECT id, role, email, COALESCE(full_name, ''), COALESCE(date_of_birth, '-infinity'), COALESCE(gender, ''), COALESCE(phone_number, ''), COALESCE(account_status, ''), COALESCE(image_url, ''), is_verified, created_at, updated_at FROM users WHERE email=$1 LIMIT 1;`, email).Scan(&user.Id, &user.Role, &user.Email, &user.FullName, &user.DateOfBirth, &user.Gender, &user.PhoneNumber, &user.AccountStatus, &user.ImageUrl, &user.IsVerified, &user.CreatedAt, &user.UpdatedAt)
+	var user User
+	err := repo.db.QueryRowContext(ctx, `SELECT id, role, email, full_name, date_of_birth, gender, phone_number, account_status, image_url, is_verified, created_at, updated_at FROM users WHERE email=$1 LIMIT 1;`, email).Scan(&user.Id, &user.Role, &user.Email, &user.FullName, &user.DateOfBirth, &user.Gender, &user.PhoneNumber, &user.AccountStatus, &user.ImageUrl, &user.IsVerified, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -63,12 +63,12 @@ func (repo *Repo) GetUserByEmail(ctx context.Context, email string) (*User, erro
 			case "undefined_column":
 				return nil, ErrUserNotFound
 			default:
-				return nil, errors.New(code)
+				return nil, fmt.Errorf("Failed to get user by email: %w", err)
 			}
 		}
 		return nil, err
 	}
-	return user, nil
+	return &user, nil
 }
 
 func (repo *Repo) CreateUser(ctx context.Context, email string) (uint64, error) {
