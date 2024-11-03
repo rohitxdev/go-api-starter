@@ -26,7 +26,7 @@ import (
 )
 
 //go:embed web docs
-var fileSystem embed.FS
+var fs embed.FS
 
 func main() {
 	if _, err := maxprocs.Set(); err != nil {
@@ -86,11 +86,11 @@ func main() {
 		panic("Failed to connect to S3 client: " + err.Error())
 	}
 
-	emailTemplates, err := template.ParseFS(fileSystem, "web/templates/emails/*.tmpl")
+	emailTemplates, err := template.ParseFS(fs, "web/templates/emails/*.tmpl")
 	if err != nil {
 		panic("Failed to parse email templates: " + err.Error())
 	}
-	emailClient := email.New(&email.SMTPCredentials{
+	emailer := email.New(&email.SMTPCredentials{
 		Host:     cfg.SMTPHost,
 		Port:     cfg.SMTPPort,
 		Username: cfg.SMTPUsername,
@@ -101,9 +101,9 @@ func main() {
 		Config:     cfg,
 		KVStore:    kv,
 		Repo:       r,
-		Email:      emailClient,
+		Email:      emailer,
 		BlobStore:  bs,
-		FileSystem: &fileSystem,
+		FileSystem: &fs,
 		Logger:     log,
 	})
 	if err != nil {

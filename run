@@ -25,16 +25,16 @@ print() {
     declare -A colors=(["debug"]="30" ["loading"]="36" ["info"]="37" ["success"]="32" ["warn"]="33" ["error"]="31")
     local prefix
     case "$1" in
-    "debug") prefix="⚙ " ;;
-    "loading") prefix="⧗ " ;;
-    "info") prefix="➤ " ;;
-    "success") prefix="✔ " ;;
-    "warn") prefix="⚠ " ;;
-    "error") prefix="✗ " ;;
-    *) prefix="" ;;
+    "debug") prefix="⚙" ;;
+    "loading") prefix="⧗" ;;
+    "info") prefix="➤" ;;
+    "success") prefix="✔" ;;
+    "warn") prefix="⚠" ;;
+    "error") prefix="✗" ;;
+    *) prefix=" " ;;
     esac
 
-    local text="$prefix$2"
+    local text="$prefix $2"
     if tput colors &>/dev/null; then
         printf "\x1b[%sm%s\x1b[0m\n" "${colors[$1]}" "${text:-$1}"
     else

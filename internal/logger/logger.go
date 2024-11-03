@@ -3,7 +3,6 @@ package logger
 import (
 	"io"
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -21,8 +20,8 @@ func New(w io.Writer, pretty bool) *zerolog.Logger {
 		return &z
 	}
 	asyncWriter := diode.NewWriter(w, 10000, 0, func(missed int) {
-		slog.Error("Zerolog: Dropped logs due to slow writer", "dropped", missed)
-		os.Exit(1)
+		slogHandler := slog.NewJSONHandler(w, &slog.HandlerOptions{Level: slog.LevelDebug})
+		slog.New(slogHandler).Error("Zerolog: Dropped logs due to slow writer", "dropped", missed)
 	})
 	z := zerolog.New(asyncWriter).With().Timestamp().Logger()
 	return &z
