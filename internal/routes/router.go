@@ -175,7 +175,7 @@ func NewRouter(svc *Services) (*echo.Echo, error) {
 	e.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
 		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
 			svc.Logger.Error().Ctx(c.Request().Context()).
-				Any("error", err).
+				Err(err).
 				Str("stack", string(stack)).
 				Str("method", c.Request().Method).
 				Str("path", c.Path()).
