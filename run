@@ -10,7 +10,7 @@ ENV_FILE="${ENV_FILE:-".env"}"
 [[ -r $ENV_FILE ]] && source "$ENV_FILE"
 
 PACKAGE_NAME=$(awk '/^module/ { print $2 }' go.mod)
-APP_NAME="$(echo "$PACKAGE_NAME" | cut -d '/' -f 3)"
+APP_NAME="$(basename "$PACKAGE_NAME")"
 APP_VERSION="$(git describe --tags --always --dirty)"
 GO_VERSION=$(awk '/^go/ { print $2 }' go.mod)
 BASE_IMAGE_TAG=":$GO_VERSION-alpine3.20"
@@ -25,7 +25,7 @@ prompt() {
 }
 
 print() {
-    declare -A colors=(["debug"]="30" ["loading"]="36" ["info"]="37" ["success"]="32" ["warn"]="33" ["error"]="31")
+    declare -A colors=(["debug"]="30" ["loading"]="30" ["info"]="36" ["success"]="32" ["warn"]="33" ["error"]="31")
     local prefix
     case "$1" in
     "debug") prefix="⚙" ;;
@@ -46,24 +46,27 @@ print() {
 }
 
 print_menu() {
-    local -a tasks
-    while read -r n task_name; do
-        task_name=$(echo "$task_name" | sed 's/task_//; s/() {//')
-        task_desc=$(awk "NR==$((n - 1))" "$0")
-        tasks+=("$(printf "%-16s - %s\n" "$task_name" "${task_desc:1}")")
-    done <<<"$(awk '/^task_/ { print NR, $0 }' "$0")"
+    echo "Available tasks:
 
-    mapfile -t tasks < <(printf "%s\n" "${tasks[@]}" | sort)
+➤ watch        - Run live development server
+➤ build        - Build go app for production release and generate OpenAPI docs
+➤ start        - Run go app binary
+➤ docker:watch - Run live development server in docker
+➤ docker:build - Build the Docker image for production
+➤ docker:push  - Push the production docker image to registry
+➤ test         - Run tests
+➤ test:cover   - Run tests and show coverage report
+➤ benchmark    - Run benchmarks
+➤ clean        - Clean go mod & cache & remove build artifacts
+➤ checkpoint   - Create a git checkpoint and push changes to origin
+➤ pprof        - Start pprof profile
+➤ upgrade      - Upgrade dependencies
 
-    echo "Available tasks:"
-    for task in "${tasks[@]}"; do
-        echo "➤ $task"
-    done
-    echo "Usage: $0 <task>"
+Usage: $0 <task>"
 }
 
 # Run live development server in docker
-task_docker_watch() {
+docker_watch() {
     local compose_file="docker-compose.yaml"
     docker compose -f "$compose_file" down --remove-orphans
     docker compose -f "$compose_file" rm --force
@@ -73,17 +76,19 @@ task_docker_watch() {
 repo="$(echo "$PACKAGE_NAME" | cut -d '/' -f 2-)"
 readonly repo
 readonly tag="$APP_VERSION"
-# Build docker image for release
-task_docker_build() {
+readonly build_path="./bin/main"
+readonly image_name="$repo:$tag"
+
+docker_build() {
     if docker images | grep "$repo:$tag" >/dev/null; then
         docker rmi "$repo:$tag" --force
     fi
-    docker build --tag "$repo:$tag" --target production --platform linux/amd64 --build-arg BASE_IMAGE_TAG="$BASE_IMAGE_TAG" .
-    print info "Image: $repo:$tag"
+    docker build --tag "$image_name" --target production --platform linux/amd64 --build-arg BASE_IMAGE_TAG="$BASE_IMAGE_TAG" .
+    echo
+    print info "Image: $image_name" --target production --platform linux/amd64 --build-arg BASE_IMAGE_TAG="$BASE_IMAGE_TAG" .
 }
 
-# Push production docker image to registry
-task_docker_push() {
+docker_push() {
     if echo "$tag" | grep "dirty" >/dev/null; then
         print error "Image tag is dirty. Please commit the changes and re-build the image."
         return 1
@@ -91,8 +96,8 @@ task_docker_push() {
     if [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_PASSWORD" ]]; then
         docker login --username "$DOCKERHUB_USERNAME" --password-stdin <<<"$DOCKERHUB_PASSWORD"
     fi
-    docker tag "$repo:$tag" "$repo:latest"
-    docker push "$repo:$tag"
+    docker tag "$image_name" "$repo:latest"
+    docker push "$image_name"
     docker push "$repo:latest"
     echo
     print info "The following images were pushed to registry:
@@ -100,10 +105,9 @@ task_docker_push() {
     - $repo:latest"
 }
 
-# Run live development server
-task_watch() {
+watch() {
     local tmp_dir=".tmp"
-    local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/internal/config.AppName=$APP_NAME -X $PACKAGE_NAME/internal/config.BuildID=$APP_VERSION -X $PACKAGE_NAME/internal/config.BuildType=debug\" --race -o $tmp_dir/main  ."
+    local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/internal/config.AppName=$APP_NAME -X $PACKAGE_NAME/internal/config.AppVersion=$APP_VERSION -X $PACKAGE_NAME/internal/config.BuildType=debug\" --race -o $tmp_dir/main  ."
 
     if ! command -v air &>/dev/null; then
         print loading "Installing air..."
@@ -115,19 +119,16 @@ task_watch() {
         --build.include_ext "go,tmpl,env,json" --build.send_interrupt true --log.main_only true
 }
 
-readonly build_path="./bin/main"
-# Build go app for production release and generate OpenAPI docs
-task_build() {
-    local build_id="$APP_VERSION"
+build() {
     local build_cmd="CGO_ENABLED=0 go build \
-        -ldflags='-s -w -X $PACKAGE_NAME/internal/config.AppName=$APP_NAME -X $PACKAGE_NAME/internal/config.BuildID=$build_id -X $PACKAGE_NAME/internal/config.BuildType=release -extldflags \"-static\"' \
+        -ldflags='-s -w -X $PACKAGE_NAME/internal/config.AppName=$APP_NAME -X $PACKAGE_NAME/internal/config.AppVersion=$APP_VERSION -X $PACKAGE_NAME/internal/config.BuildType=release -extldflags \"-static\"' \
         --trimpath -o $build_path ."
 
     print loading "Building app..."
     if go generate ./...; then
-        print success "Swagger docs generated"
+        print success "OpenAPI docs generated"
     else
-        print error "Failed to generate swagger docs"
+        print error "Failed to generate OpenAPI docs"
         return 1
     fi
 
@@ -142,12 +143,11 @@ task_build() {
         return 1
     fi
 
-    print success "Build succesful"
-    print debug "Build ID: $build_id"
+    print success "Build successful"
+    print debug "App version: $APP_VERSION"
 }
 
-# Run go app build
-task_start() {
+start() {
     if [[ ! -x "$build_path" ]]; then
         print error "Build not found."
         return 1
@@ -155,26 +155,22 @@ task_start() {
     "$build_path"
 }
 
-# Run tests
-task_test() {
+test() {
     print loading "Running tests..."
     go test --race --count=2 -v ./...
 }
 
-# Run tests and show coverage
-task_test_cover() {
+test_cover() {
     print loading "Running tests and generating coverage report..."
     SECRETS_FILE=../../secrets.json go test --race --coverprofile=./tmp/coverage.out ./... && go tool cover --html=./tmp/coverage.out
 }
 
-# Run benchmarks
-task_benchmark() {
+benchmark() {
     print loading "Running benchmarks..."
     SECRETS_FILE=../../secrets.json go test --race --count=2 -v --benchmem --bench=. ./...
 }
 
-# Clean go mod & cache & remove build artifacts
-task_clean() {
+clean() {
     print loading "Cleaning..."
     go mod tidy -v
     go clean --cache
@@ -182,8 +178,7 @@ task_clean() {
     print success "Cleaned up"
 }
 
-# Generate pprof profile
-task_pprof() {
+pprof() {
     print loading "Generating pprof profile..."
     if [[ -z "$PORT" ]]; then
         print error "PORT is not set"
@@ -192,9 +187,8 @@ task_pprof() {
     curl "http://localhost:${PORT}/debug/pprof/profile?seconds=30" >default.pgo && print success "Pprof profile generated"
 }
 
-# Create a git checkpoint and push to origin
-task_checkpoint() {
-    if (! prompt "Create git checkpoint and push changes to origin?") || (! task_build && ! prompt "Still continue?"); then
+checkpoint() {
+    if (! prompt "Create git checkpoint and push changes to origin?") || (! build && ! prompt "Still continue?"); then
         print "Quitting..."
         return 1
     fi
@@ -205,8 +199,7 @@ task_checkpoint() {
     print success "Checkpoint created"
 }
 
-# Upgrade dependencies
-task_upgrade_deps() {
+upgrade() {
     print loading "Checking for updates..."
     if ! go get -u ./...; then
         print error "Failed to upgrade packages"
@@ -216,8 +209,47 @@ task_upgrade_deps() {
     print debug "To upgrade major versions, run 'go get -u <package>@<version>' for each package manually"
 }
 
-if [[ -z "$(declare -F "task_$1")" ]]; then
+case "$1" in
+"watch")
+    watch
+    ;;
+"build")
+    build
+    ;;
+"start")
+    start
+    ;;
+"docker:watch")
+    docker_watch
+    ;;
+"docker:build")
+    docker_build
+    ;;
+"docker:push")
+    docker_push
+    ;;
+"test")
+    test
+    ;;
+"test:cover")
+    test_cover
+    ;;
+"benchmark")
+    benchmark
+    ;;
+"clean")
+    clean
+    ;;
+"checkpoint")
+    checkpoint
+    ;;
+"pprof")
+    pprof
+    ;;
+"upgrade")
+    upgrade
+    ;;
+*)
     print_menu
-else
-    "task_$*"
-fi
+    ;;
+esac

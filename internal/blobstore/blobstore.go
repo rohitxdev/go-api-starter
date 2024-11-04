@@ -17,15 +17,6 @@ var (
 	ErrFileEmpty = errors.New("file is empty")
 )
 
-type Storer interface {
-	Put(context.Context, *PutParams) (string, error)
-	Get(context.Context, *GetParams) (string, error)
-	Delete(context.Context, *DeleteParams) (string, error)
-	List(context.Context, *ListParams) ([]FileMetaData, error)
-}
-
-var _ Storer = (*Store)(nil)
-
 type Store struct {
 	client        *s3.Client
 	presignClient *s3.PresignClient

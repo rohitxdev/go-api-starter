@@ -18,14 +18,14 @@ import (
 	"github.com/rohitxdev/go-api-starter/internal/config"
 	"github.com/rohitxdev/go-api-starter/internal/database"
 	"github.com/rohitxdev/go-api-starter/internal/email"
-	"github.com/rohitxdev/go-api-starter/internal/kv"
+	"github.com/rohitxdev/go-api-starter/internal/kvstore"
 	"github.com/rohitxdev/go-api-starter/internal/logger"
 	"github.com/rohitxdev/go-api-starter/internal/repo"
 	"github.com/rohitxdev/go-api-starter/internal/routes"
 	"go.uber.org/automaxprocs/maxprocs"
 )
 
-//go:embed web docs
+//go:embed public templates docs
 var fs embed.FS
 
 func main() {
@@ -40,14 +40,14 @@ func main() {
 	}
 
 	//Set up logger
-	log := logger.New(os.Stderr, cfg.IsDev)
+	logr := logger.New(os.Stderr, cfg.IsDev)
 
-	log.Debug().
-		Str("BuildID", cfg.BuildID).
+	logr.Debug().
+		Str("AppVersion", cfg.AppVersion).
 		Str("BuildType", cfg.BuildType).
-		Str("Platform", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)).
-		Int("MaxProcs", runtime.GOMAXPROCS(0)).
 		Str("Env", cfg.Env).
+		Int("MaxProcs", runtime.GOMAXPROCS(0)).
+		Str("Platform", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)).
 		Msg("Running " + cfg.AppName)
 
 	//Connect to postgres database
@@ -55,24 +55,25 @@ func main() {
 	if err != nil {
 		panic("Failed to connect to database: " + err.Error())
 	}
+	logr.Debug().Msg("Connected to database")
 	defer func() {
 		if err = db.Close(); err != nil {
 			panic("Failed to close database: " + err.Error())
 		}
-		log.Debug().Msg("Database connection closed")
+		logr.Debug().Msg("Database connection closed")
 	}()
-	log.Debug().Msg("Connected to database")
 
 	//Connect to KV store
-	kv, err := kv.New("kv", time.Minute*5)
+	kv, err := kvstore.New("kv", time.Minute*5)
 	if err != nil {
 		panic("Failed to connect to KV store: " + err.Error())
 	}
+
+	logr.Debug().Msg("Connected to KV store")
 	defer func() {
 		kv.Close()
-		log.Debug().Msg("KV store closed")
+		logr.Debug().Msg("KV store closed")
 	}()
-	log.Debug().Msg("Connected to KV store")
 
 	// Create repo
 	r, err := repo.New(db)
@@ -86,7 +87,7 @@ func main() {
 		panic("Failed to connect to S3 client: " + err.Error())
 	}
 
-	emailTemplates, err := template.ParseFS(fs, "web/templates/emails/*.tmpl")
+	emailTemplates, err := template.ParseFS(fs, "templates/emails/*.tmpl")
 	if err != nil {
 		panic("Failed to parse email templates: " + err.Error())
 	}
@@ -104,7 +105,7 @@ func main() {
 		Email:      emailer,
 		BlobStore:  bs,
 		FileSystem: &fs,
-		Logger:     log,
+		Logger:     logr,
 	})
 	if err != nil {
 		panic("Failed to create router: " + err.Error())
@@ -127,8 +128,8 @@ func main() {
 		}
 	}()
 
-	log.Debug().Msg("HTTP server started")
-	log.Info().Msg(fmt.Sprintf("Server is listening on http://%s and is ready to serve requests", ls.Addr()))
+	logr.Debug().Msg("HTTP server started")
+	logr.Info().Msg(fmt.Sprintf("Server is listening on http://%s and is ready to serve requests", ls.Addr()))
 
 	//Shut down HTTP server gracefully
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -143,5 +144,5 @@ func main() {
 		panic("Failed to shutdown http server: " + err.Error())
 	}
 
-	log.Debug().Msg("HTTP server shut down gracefully")
+	logr.Debug().Msg("HTTP server shut down gracefully")
 }

@@ -12,48 +12,36 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
-// This is set at compile time.
+// These variables are set by the build process.
 var (
-	AppName   string
-	BuildType string
-	BuildID   string
+	AppName    string
+	AppVersion string
+	BuildType  string
 )
 
 type Config struct {
-	// AppName is the name of the application as written in go.mod file.
-	AppName string `json:"appName" validate:"required"`
-	// BuildType is the type of build, either "debug" or "release".
-	BuildType string `json:"buildType" validate:"required"`
-	// BuildID is the build ID of the application.
-	BuildID string `json:"buildId" validate:"required"`
-	// Env is the environment in which the server is running.
-	Env string `json:"env" validate:"required,oneof=development production"`
-	// GoogleOAuth2Config is the configuration for Google OAuth2 authentication.
-	GoogleOAuth2Config *oauth2.Config `json:"googleOAuth2Config"`
+	AppName    string `json:"appName" validate:"required"`
+	AppVersion string `json:"appVersion" validate:"required"`
+	BuildType  string `json:"buildType" validate:"required,oneof=debug release"`
+	Env        string `json:"env" validate:"required,oneof=development production"`
 	// Host is the hostname of the server.
 	Host string `json:"host" validate:"required,ip"`
 	// Port is the port of the server.
 	Port string `json:"port" validate:"required,gte=0"`
 	// DatabaseURL is the URL of the database.
-	DatabaseURL string `json:"databaseUrl" validate:"required"`
-	// SMTPHost is the host of the SMTP server.
-	SMTPHost string `json:"smtpHost" validate:"required"`
-	// SMTPUsername is the username for the SMTP server.
+	DatabaseURL  string `json:"databaseUrl" validate:"required"`
+	SMTPHost     string `json:"smtpHost" validate:"required"`
 	SMTPUsername string `json:"smtpUsername" validate:"required"`
-	// SMTPPassword is the password for the SMTP server.
 	SMTPPassword string `json:"smtpPassword" validate:"required"`
 	// SenderEmail is the email address from which emails will be sent.
-	SenderEmail string `json:"senderEmail" validate:"required"`
-	// S3BucketName is the name of the S3 bucket.
-	S3BucketName string `json:"s3BucketName"`
-	// S3Endpoint is the endpoint of the S3 server.
-	S3Endpoint string `json:"s3Endpoint"`
-	// S3DefaultRegion is the default region of the S3 server.
-	S3DefaultRegion string `json:"s3DefaultRegion"`
-	// AWSAccessKeyID is the access key ID for the S3 server.
-	AWSAccessKeyID string `json:"awsAccessKeyId"`
-	// AWSAccessKeySecret is the access key secret for the S3 server.
+	SenderEmail        string `json:"senderEmail" validate:"required"`
+	S3BucketName       string `json:"s3BucketName"`
+	S3Endpoint         string `json:"s3Endpoint"`
+	S3DefaultRegion    string `json:"s3DefaultRegion"`
+	AWSAccessKeyID     string `json:"awsAccessKeyId"`
 	AWSAccessKeySecret string `json:"awsAccessKeySecret"`
+	// GoogleOAuth2Config is the configuration for Google OAuth2 authentication.
+	GoogleOAuth2Config *oauth2.Config `json:"googleOAuth2Config"`
 	// GoogleClientID is the client ID for Google OAuth2 authentication.
 	GoogleClientID string `json:"googleClientId"`
 	// GoogleClientSecret is the client secret for Google OAuth2 authentication.
@@ -66,8 +54,6 @@ type Config struct {
 	AllowedOrigins []string `json:"allowedOrigins"`
 	// ShutdownTimeout is the duration after which the server will be shutdown gracefully.
 	ShutdownTimeout time.Duration `json:"shutdownTimeout" validate:"required"`
-	// RateLimitPerMinute is the rate limit per minute for the API.
-	RateLimitPerMinute int `json:"rateLimitPerMinute" validate:"required"`
 	// SMTPPort is the port of the SMTP server.
 	SMTPPort int `json:"smtpPort" validate:"required"`
 	// IsDev is a flag indicating whether the server is running in development mode.
@@ -121,8 +107,8 @@ func Load() (*Config, error) {
 		Scopes:       []string{"openid email", "openid profile"},
 	}
 	cfg.AppName = AppName
+	cfg.AppVersion = AppVersion
 	cfg.BuildType = BuildType
-	cfg.BuildID = BuildID
 	cfg.IsDev = cfg.Env != "production"
 
 	if err = validator.New().Struct(cfg); err != nil {

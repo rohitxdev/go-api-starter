@@ -11,14 +11,6 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
-type Emailer interface {
-	SendRaw(headers *Headers, mimeType string, body string, attachments ...Attachment) error
-	SendHTML(headers *Headers, templateName string, data map[string]any, attachments ...Attachment) error
-	SendText(headers *Headers, body string, attachments ...Attachment) error
-}
-
-var _ Emailer = (*Client)(nil)
-
 type SMTPCredentials struct {
 	Username string
 	Password string

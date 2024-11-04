@@ -8,7 +8,7 @@ import (
 	"github.com/rohitxdev/go-api-starter/internal/blobstore"
 	"github.com/rohitxdev/go-api-starter/internal/config"
 	"github.com/rohitxdev/go-api-starter/internal/email"
-	"github.com/rohitxdev/go-api-starter/internal/kv"
+	"github.com/rohitxdev/go-api-starter/internal/kvstore"
 	"github.com/rohitxdev/go-api-starter/internal/repo"
 	"github.com/rs/zerolog"
 )
@@ -17,9 +17,9 @@ type Services struct {
 	Config     *config.Config
 	FileSystem *embed.FS
 	Repo       *repo.Repo
-	Email      email.Emailer
-	BlobStore  blobstore.Storer
-	KVStore    *kv.Store
+	Email      *email.Client
+	BlobStore  *blobstore.Store
+	KVStore    *kvstore.Store
 	Logger     *zerolog.Logger
 }
 
@@ -29,11 +29,7 @@ type Services struct {
 // @Success 200 {html} string "home page"
 func GetHome(svc *Services) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		data := echo.Map{
-			"buildId": svc.Config.BuildID,
-			"env":     svc.Config.Env,
-		}
-		return c.Render(http.StatusOK, "home.tmpl", data)
+		return c.Render(http.StatusOK, "home.tmpl", nil)
 	}
 }
 
@@ -52,12 +48,12 @@ func GetPing(svc *Services) echo.HandlerFunc {
 // @Router /config [get]
 // @Success 200 {object} map[string]any
 func GetConfig(svc *Services) echo.HandlerFunc {
+	clientConfig := map[string]any{
+		"env":        svc.Config.Env,
+		"appName":    svc.Config.AppName,
+		"appVersion": svc.Config.AppVersion,
+	}
 	return func(c echo.Context) error {
-		clientConfig := map[string]any{
-			"env":     svc.Config.Env,
-			"buildId": config.BuildID,
-			"isDev":   svc.Config.IsDev,
-		}
 		return c.JSON(http.StatusOK, clientConfig)
 	}
 }

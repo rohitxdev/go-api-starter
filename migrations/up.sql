@@ -19,8 +19,7 @@ CREATE TABLE users (
 );
 
 -- Create a function to update the updated_at column
-CREATE
-OR REPLACE FUNCTION set_updated_at_column () RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION set_updated_at_column () RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = current_timestamp; 
     RETURN NEW; 
@@ -30,4 +29,4 @@ $$ LANGUAGE plpgsql;
 -- Create the trigger
 CREATE TRIGGER set_updated_at BEFORE
 UPDATE ON users FOR EACH ROW
-EXECUTE FUNCTION set_updated_at_column ();
+EXECUTE FUNCTION set_updated_at_column();

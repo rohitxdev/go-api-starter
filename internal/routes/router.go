@@ -21,7 +21,6 @@ import (
 	"github.com/rohitxdev/go-api-starter/docs"
 	"github.com/rohitxdev/go-api-starter/internal/repo"
 	echoSwagger "github.com/swaggo/echo-swagger"
-	"golang.org/x/time/rate"
 )
 
 // Custom view renderer
@@ -83,7 +82,7 @@ func NewRouter(svc *Services) (*echo.Echo, error) {
 		echo.TrustPrivateNet(false), // e.g. ipv4 start with 10. or 192.168
 	)
 
-	pageTemplates, err := template.ParseFS(svc.FileSystem, "web/templates/pages/*.tmpl")
+	pageTemplates, err := template.ParseFS(svc.FileSystem, "templates/pages/*.tmpl")
 	if err != nil {
 		return nil, fmt.Errorf("could not parse templates: %w", err)
 	}
@@ -91,12 +90,6 @@ func NewRouter(svc *Services) (*echo.Echo, error) {
 		templates: pageTemplates,
 	}
 
-	setUpMiddleware(e, svc)
-	setUpRoutes(e, svc)
-	return e, nil
-}
-
-func setUpMiddleware(e *echo.Echo, svc *Services) {
 	//Pre-router middlewares
 	if !svc.Config.IsDev {
 		e.Pre(middleware.CSRF())
@@ -108,18 +101,10 @@ func setUpMiddleware(e *echo.Echo, svc *Services) {
 		UnsafeWildcardOriginWithAllowCredentials: svc.Config.IsDev,
 	}))
 
-	if svc.Config.RateLimitPerMinute > 0 {
-		e.Pre(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
-			Store: middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
-				Rate:      rate.Limit(svc.Config.RateLimitPerMinute),
-				ExpiresIn: time.Minute,
-			})}))
-	}
-
 	e.Pre(middleware.Secure())
 
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
-		Root:       "web/public",
+		Root:       "public",
 		Filesystem: http.FS(svc.FileSystem),
 	}))
 
@@ -132,9 +117,7 @@ func setUpMiddleware(e *echo.Echo, svc *Services) {
 	e.Pre(session.Middleware(sessions.NewCookieStore([]byte(svc.Config.SessionSecret))))
 
 	e.Pre(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
-		Generator: func() string {
-			return "req_" + ulid.Make().String()
-		},
+		Generator: ulid.Make().String,
 	}))
 
 	e.Pre(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
@@ -205,6 +188,10 @@ func setUpMiddleware(e *echo.Echo, svc *Services) {
 	e.Use(echoprometheus.NewMiddleware("api"))
 
 	pprof.Register(e)
+
+	setUpRoutes(e, svc)
+
+	return e, nil
 }
 
 func setUpRoutes(e *echo.Echo, svc *Services) {
