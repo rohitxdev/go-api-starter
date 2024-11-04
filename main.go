@@ -99,13 +99,13 @@ func main() {
 	}, emailTemplates)
 
 	e, err := routes.NewRouter(&routes.Services{
-		Config:     cfg,
-		KVStore:    kv,
-		Repo:       r,
-		Email:      emailer,
 		BlobStore:  bs,
-		FileSystem: &fs,
+		Config:     cfg,
+		EmbeddedFS: &fs,
+		Email:      emailer,
+		KVStore:    kv,
 		Logger:     logr,
+		Repo:       r,
 	})
 	if err != nil {
 		panic("Failed to create router: " + err.Error())

@@ -82,7 +82,7 @@ func NewRouter(svc *Services) (*echo.Echo, error) {
 		echo.TrustPrivateNet(false), // e.g. ipv4 start with 10. or 192.168
 	)
 
-	pageTemplates, err := template.ParseFS(svc.FileSystem, "templates/pages/*.tmpl")
+	pageTemplates, err := template.ParseFS(svc.EmbeddedFS, "templates/pages/*.tmpl")
 	if err != nil {
 		return nil, fmt.Errorf("could not parse templates: %w", err)
 	}
@@ -105,7 +105,7 @@ func NewRouter(svc *Services) (*echo.Echo, error) {
 
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
 		Root:       "public",
-		Filesystem: http.FS(svc.FileSystem),
+		Filesystem: http.FS(svc.EmbeddedFS),
 	}))
 
 	e.Pre(middleware.TimeoutWithConfig(middleware.TimeoutConfig{

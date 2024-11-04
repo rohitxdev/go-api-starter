@@ -14,13 +14,13 @@ import (
 )
 
 type Services struct {
-	Config     *config.Config
-	FileSystem *embed.FS
-	Repo       *repo.Repo
-	Email      *email.Client
 	BlobStore  *blobstore.Store
+	Config     *config.Config
+	EmbeddedFS *embed.FS
+	Email      *email.Client
 	KVStore    *kvstore.Store
 	Logger     *zerolog.Logger
+	Repo       *repo.Repo
 }
 
 // @Summary Home Page
