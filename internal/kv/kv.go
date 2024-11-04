@@ -24,7 +24,7 @@ type Store struct {
 }
 
 func New(dbName string, purgeFreq time.Duration) (*Store, error) {
-	db, err := database.NewSqlite(dbName)
+	db, err := database.NewSQLite(dbName)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create kv store: %w", err)
 	}

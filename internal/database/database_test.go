@@ -11,7 +11,7 @@ import (
 func TestSqlite(t *testing.T) {
 	dbName := "test_db"
 	t.Run("Create DB", func(t *testing.T) {
-		db, err := database.NewSqlite(dbName)
+		db, err := database.NewSQLite(dbName)
 		assert.Nil(t, err)
 		defer db.Close()
 	})

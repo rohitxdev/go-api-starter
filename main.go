@@ -51,7 +51,7 @@ func main() {
 		Msg("Running " + cfg.AppName)
 
 	//Connect to postgres database
-	db, err := database.NewPostgres(cfg.DatabaseURL)
+	db, err := database.NewPostgreSQL(cfg.DatabaseURL)
 	if err != nil {
 		panic("Failed to connect to database: " + err.Error())
 	}

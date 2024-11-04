@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "modernc.org/sqlite"
 )
 
@@ -31,7 +32,7 @@ func createDirIfNotExists(path string) error {
 }
 
 // 'dbName' is the name of the database file. Pass :memory: for in-memory database.
-func NewSqlite(dbName string) (*sql.DB, error) {
+func NewSQLite(dbName string) (*sql.DB, error) {
 	if dbName != ":memory:" {
 		if err := createDirIfNotExists(dirName); err != nil {
 			return nil, err
@@ -72,14 +73,14 @@ func NewSqlite(dbName string) (*sql.DB, error) {
 	return db, nil
 }
 
-// 'uri' is the connection string and should be in the form of postgres://user:password@host:port/dbname?sslmode=disable&foo=bar
-func NewPostgres(uri string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", uri)
+// 'uri' is the connection string and should be in the form of postgres://user:password@host:port/dbname?sslmode=disable&foo=bar.
+func NewPostgreSQL(uri string) (*sql.DB, error) {
+	db, err := sql.Open("pgx", uri)
 	if err != nil {
-		return nil, fmt.Errorf("could not open postgres database: %w", err)
+		return nil, fmt.Errorf("Failed to open postgres database: %w", err)
 	}
 	if err = db.Ping(); err != nil {
-		return nil, fmt.Errorf("could not ping postgres database: %w", err)
+		return nil, fmt.Errorf("Failed to ping postgres database: %w", err)
 	}
 	return db, nil
 }
