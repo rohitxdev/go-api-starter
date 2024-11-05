@@ -132,6 +132,7 @@ func NewRouter(svc *Services) (*echo.Echo, error) {
 		LogReferer:      true,
 		LogUserAgent:    true,
 		LogError:        true,
+		LogHost:         true,
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
 			log := svc.Logger.Info().
 				Ctx(c.Request().Context()).
@@ -143,16 +144,17 @@ func NewRouter(svc *Services) (*echo.Echo, error) {
 				Int64("durationMs", v.Latency.Milliseconds()).
 				Int64("resBytes", v.ResponseSize).
 				Int("status", v.Status).
+				Str("host", v.Host).
 				Err(v.Error)
 
-			if user, ok := c.Get("user").(*repo.User); ok && (user != nil) {
-				log = log.Uint64("userId", user.Id)
-			}
 			if v.UserAgent != "" {
 				log = log.Str("ua", v.UserAgent)
 			}
 			if v.Referer != "" {
 				log = log.Str("referer", v.Referer)
+			}
+			if user, ok := c.Get("user").(*repo.User); ok && (user != nil) {
+				log = log.Uint64("userId", user.Id)
 			}
 
 			log.Msg("HTTP request")

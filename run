@@ -192,6 +192,7 @@ checkpoint() {
         print "Quitting..."
         return 1
     fi
+    clean
     if ! (git add . && git commit -m "Checkpoint - $(date -u)" && git push); then
         print error "Failed to create checkpoint"
         return 1
