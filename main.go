@@ -23,6 +23,8 @@ import (
 	"github.com/rohitxdev/go-api-starter/internal/repo"
 	"github.com/rohitxdev/go-api-starter/internal/routes"
 	"go.uber.org/automaxprocs/maxprocs"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 //go:embed public templates docs
@@ -43,11 +45,11 @@ func main() {
 	logr := logger.New(os.Stderr, cfg.IsDev)
 
 	logr.Debug().
-		Str("AppVersion", cfg.AppVersion).
-		Str("BuildType", cfg.BuildType).
-		Str("Env", cfg.Env).
-		Int("MaxProcs", runtime.GOMAXPROCS(0)).
-		Str("Platform", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)).
+		Str("appVersion", cfg.AppVersion).
+		Str("buildType", cfg.BuildType).
+		Str("env", cfg.Env).
+		Int("maxProcs", runtime.GOMAXPROCS(0)).
+		Str("platform", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)).
 		Msg("Running " + cfg.AppName)
 
 	//Connect to postgres database
@@ -123,7 +125,9 @@ func main() {
 
 	//Start HTTP server
 	go func() {
-		if err := http.Serve(ls, e); err != nil && !errors.Is(err, net.ErrClosed) {
+		// Stdlib supports HTTP/2 by default when serving over TLS, but has to be explicitly enabled otherwise.
+		handler := h2c.NewHandler(e, &http2.Server{})
+		if err := http.Serve(ls, handler); err != nil && !errors.Is(err, net.ErrClosed) {
 			panic("Failed to serve HTTP: " + err.Error())
 		}
 	}()
@@ -131,13 +135,14 @@ func main() {
 	logr.Debug().Msg("HTTP server started")
 	logr.Info().Msg(fmt.Sprintf("Server is listening on http://%s and is ready to serve requests", ls.Addr()))
 
+	ctx := context.Background()
 	//Shut down HTTP server gracefully
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
 
 	<-ctx.Done()
 
-	ctx, cancel = context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+	ctx, cancel = context.WithTimeout(ctx, cfg.ShutdownTimeout)
 	defer cancel()
 
 	if err := e.Shutdown(ctx); err != nil {

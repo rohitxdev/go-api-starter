@@ -51,11 +51,11 @@ print_menu() {
 ➤ watch        - Run live development server
 ➤ build        - Build go app for production release and generate OpenAPI docs
 ➤ start        - Run go app binary
-➤ docker:watch - Run live development server in docker
-➤ docker:build - Build the Docker image for production
-➤ docker:push  - Push the production docker image to registry
+➤ docker.watch - Run live development server in docker
+➤ docker.build - Build the Docker image for production
+➤ docker.push  - Push the production docker image to registry
 ➤ test         - Run tests
-➤ test:cover   - Run tests and show coverage report
+➤ test.cover   - Run tests and show coverage report
 ➤ benchmark    - Run benchmarks
 ➤ clean        - Clean go mod & cache & remove build artifacts
 ➤ checkpoint   - Create a git checkpoint and push changes to origin
@@ -109,14 +109,10 @@ watch() {
     local tmp_dir=".tmp"
     local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/internal/config.AppName=$APP_NAME -X $PACKAGE_NAME/internal/config.AppVersion=$APP_VERSION -X $PACKAGE_NAME/internal/config.BuildType=debug\" --race -o $tmp_dir/main  ."
 
-    if ! command -v air &>/dev/null; then
-        print loading "Installing air..."
-        go install github.com/air-verse/air@latest
-    fi
     print loading "Starting development server..."
     # build.kill_delay is in nanoseconds
     air --tmp_dir="$tmp_dir" --build.cmd "$build_cmd" --build.bin "$tmp_dir/main" --build.delay 0 --build.kill_delay 10000000000 \
-        --build.include_ext "go,tmpl,env,json" --build.send_interrupt true --log.main_only true
+        --build.include_ext "go,tmpl" --build.send_interrupt true --log.main_only true
 }
 
 build() {
@@ -220,19 +216,19 @@ case "$1" in
 "start")
     start
     ;;
-"docker:watch")
+"docker.watch")
     docker_watch
     ;;
-"docker:build")
+"docker.build")
     docker_build
     ;;
-"docker:push")
+"docker.push")
     docker_push
     ;;
 "test")
     test
     ;;
-"test:cover")
+"test.cover")
     test_cover
     ;;
 "benchmark")

@@ -71,7 +71,6 @@ func NewRouter(svc *Services) (*echo.Echo, error) {
 	e := echo.New()
 	e.HideBanner = true
 	e.HidePort = true
-	e.Debug = svc.Config.IsDev
 	e.JSONSerializer = customJSONSerializer{}
 	e.Validator = customValidator{
 		validator: validator.New(),
@@ -137,12 +136,12 @@ func NewRouter(svc *Services) (*echo.Echo, error) {
 			log := svc.Logger.Info().
 				Ctx(c.Request().Context()).
 				Str("id", v.RequestID).
-				Str("ip", v.RemoteIP).
+				Str("remoteIp", v.RemoteIP).
 				Str("protocol", v.Protocol).
 				Str("uri", v.URI).
 				Str("method", v.Method).
 				Int64("durationMs", v.Latency.Milliseconds()).
-				Int64("resBytes", v.ResponseSize).
+				Int64("bytesOut", v.ResponseSize).
 				Int("status", v.Status).
 				Str("host", v.Host).
 				Err(v.Error)
@@ -182,6 +181,7 @@ func NewRouter(svc *Services) (*echo.Echo, error) {
 				Str("method", c.Request().Method).
 				Str("path", c.Path()).
 				Str("ip", c.RealIP()).
+				Str("id", c.Response().Header().Get(echo.HeaderXRequestID)).
 				Msg("HTTP handler panicked")
 			return nil
 		}},
@@ -198,9 +198,7 @@ func NewRouter(svc *Services) (*echo.Echo, error) {
 
 func setUpRoutes(e *echo.Echo, svc *Services) {
 	e.GET("/metrics", echoprometheus.NewHandler())
-	e.GET("/swagger/*", echoSwagger.EchoWrapHandler(func(c *echoSwagger.Config) {
-		c.SyntaxHighlight = true
-	}))
+	e.GET("/swagger/*", echoSwagger.EchoWrapHandler())
 	e.GET("/ping", GetPing(svc))
 	e.GET("/config", GetConfig(svc))
 	e.GET("/me", GetMe(svc), RestrictTo(svc, RoleUser))
