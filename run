@@ -25,7 +25,7 @@ prompt() {
 }
 
 print() {
-    declare -A colors=(["debug"]="30" ["loading"]="30" ["info"]="36" ["success"]="32" ["warn"]="33" ["error"]="31")
+    declare -A colors=(["debug"]="30" ["loading"]="37" ["info"]="36" ["success"]="32" ["warn"]="33" ["error"]="31")
     local prefix
     case "$1" in
     "debug") prefix="⚙" ;;
@@ -39,30 +39,10 @@ print() {
 
     local text="$prefix $2"
     if tput colors &>/dev/null; then
-        printf "\x1b[%sm%s\x1b[0m\n" "${colors[$1]}" "${text:-$1}"
+        printf "\x1b[1;%sm%s\x1b[0m\n" "${colors[$1]}" "${text:-$1}"
     else
         printf "%s\n" "${text:-$1}"
     fi
-}
-
-print_menu() {
-    echo "Available tasks:
-
-➤ watch        - Run live development server
-➤ build        - Build go app for production release and generate OpenAPI docs
-➤ start        - Run go app binary
-➤ docker.watch - Run live development server in docker
-➤ docker.build - Build the Docker image for production
-➤ docker.push  - Push the production docker image to registry
-➤ test         - Run tests
-➤ test.cover   - Run tests and show coverage report
-➤ benchmark    - Run benchmarks
-➤ clean        - Clean go mod & cache & remove build artifacts
-➤ checkpoint   - Create a git checkpoint and push changes to origin
-➤ pprof        - Start pprof profile
-➤ upgrade      - Upgrade dependencies
-
-Usage: $0 <task>"
 }
 
 # Run live development server in docker
@@ -83,9 +63,9 @@ docker_build() {
     if docker images | grep "$repo:$tag" >/dev/null; then
         docker rmi "$repo:$tag" --force
     fi
-    docker build --tag "$image_name" --target production --platform linux/amd64 --build-arg BASE_IMAGE_TAG="$BASE_IMAGE_TAG" .
+    docker buildx build --platform linux/amd64,linux/arm64 --tag "$image_name" --target production --build-arg BASE_IMAGE_TAG="$BASE_IMAGE_TAG" .
     echo
-    print info "Image: $image_name" --target production --platform linux/amd64 --build-arg BASE_IMAGE_TAG="$BASE_IMAGE_TAG" .
+    print info "Image: $image_name"
 }
 
 docker_push() {
@@ -120,7 +100,14 @@ build() {
         -ldflags='-s -w -X $PACKAGE_NAME/internal/config.AppName=$APP_NAME -X $PACKAGE_NAME/internal/config.AppVersion=$APP_VERSION -X $PACKAGE_NAME/internal/config.BuildType=release -extldflags \"-static\"' \
         --trimpath -o $build_path ."
 
+    print loading "Verifying go.mod"
+    if ! go mod verify &>/dev/null; then
+        print error "Go module verification failed"
+        return 1
+    fi
+
     print loading "Building app..."
+
     if go generate ./...; then
         print success "OpenAPI docs generated"
     else
@@ -134,12 +121,12 @@ build() {
     fi
 
     if file "$build_path" | grep "dynamically linked" >/dev/null; then
-        print error "Binary is still dynamically linked."
+        print error "Build binary is still dynamically linked"
         file "$build_path"
         return 1
     fi
 
-    print success "Build successful"
+    print success "Build generated"
     print debug "App version: $APP_VERSION"
 }
 
@@ -204,6 +191,26 @@ upgrade() {
     fi
     print success "Upgraded minor/patch versions of packages"
     print debug "To upgrade major versions, run 'go get -u <package>@<version>' for each package manually"
+}
+
+print_menu() {
+    echo "Available tasks:
+
+➤ watch        - Run live development server
+➤ build        - Build go app for production release and generate OpenAPI docs
+➤ start        - Run go app binary
+➤ docker.watch - Run live development server in docker
+➤ docker.build - Build the Docker image for production
+➤ docker.push  - Push the production docker image to registry
+➤ test         - Run tests
+➤ test.cover   - Run tests and show coverage report
+➤ benchmark    - Run benchmarks
+➤ clean        - Clean go mod & cache & remove build artifacts
+➤ checkpoint   - Create a git checkpoint and push changes to origin
+➤ pprof        - Start pprof profile
+➤ upgrade      - Upgrade dependencies
+
+Usage: $0 <task>"
 }
 
 case "$1" in
