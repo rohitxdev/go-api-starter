@@ -25,7 +25,7 @@ prompt() {
 }
 
 print() {
-    declare -A colors=(["debug"]="30" ["loading"]="37" ["info"]="36" ["success"]="32" ["warn"]="33" ["error"]="31")
+    declare -A colors=(["debug"]="30" ["loading"]="37" ["info"]="34" ["success"]="32" ["warn"]="33" ["error"]="31")
     local prefix
     local suffix
 
