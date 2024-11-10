@@ -39,7 +39,7 @@ print() {
 
     local text="$prefix $2"
     if tput colors &>/dev/null; then
-        printf "\x1b[1;%sm%s\x1b[0m\n" "${colors[$1]}" "${text:-$1}"
+        printf "\x1b[0;%sm%s\x1b[0m\n" "${colors[$1]}" "${text:-$1}"
     else
         printf "%s\n" "${text:-$1}"
     fi
@@ -76,6 +76,7 @@ docker_push() {
     if [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_PASSWORD" ]]; then
         docker login --username "$DOCKERHUB_USERNAME" --password-stdin <<<"$DOCKERHUB_PASSWORD"
     fi
+    print loading "Pushing docker image to $repo"
     docker tag "$image_name" "$repo:latest"
     docker push "$image_name"
     docker push "$repo:latest"
