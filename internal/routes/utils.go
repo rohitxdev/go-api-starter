@@ -14,7 +14,7 @@ const (
 	sessionMaxAge = 86400 * 30 // 30 days
 )
 
-// bindAndValidate binds path params, query params and the request body into provided type `i` and validates provided `i`. The default binder binds body based on Content-Type header. Validator must be registered using `Echo#Validator`.
+// bindAndValidate binds path params, query params and the request body into provided type `i` and validates provided `i`. `i` must be a pointer. The default binder binds body based on Content-Type header. Validator must be registered using `Echo#Validator`.
 func bindAndValidate(c echo.Context, i any) error {
 	var err error
 	if err = c.Bind(i); err != nil {

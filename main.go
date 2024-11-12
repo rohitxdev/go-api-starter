@@ -146,7 +146,7 @@ func main() {
 	defer cancel()
 
 	if err := e.Shutdown(ctx); err != nil {
-		panic("Failed to shutdown http server: " + err.Error())
+		panic("Failed to shutdown HTTP server: " + err.Error())
 	}
 
 	logr.Debug().Msg("HTTP server shut down gracefully")

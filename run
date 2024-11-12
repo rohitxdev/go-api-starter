@@ -153,7 +153,8 @@ test() {
 
 test_cover() {
     print loading "Running tests and generating coverage report"
-    SECRETS_FILE=../../secrets.json go test --race --coverprofile=./tmp/coverage.out ./... && go tool cover --html=./tmp/coverage.out
+    [[ -d .tmp ]] || mkdir .tmp
+    SECRETS_FILE=../../secrets.json go test --race --coverprofile=./.tmp/coverage.out ./... && go tool cover --html=./.tmp/coverage.out
 }
 
 benchmark() {
