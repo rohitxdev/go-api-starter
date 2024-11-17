@@ -148,7 +148,7 @@ start() {
 
 test() {
     print loading "Running tests"
-    go test --race --count=2 -v ./...
+    SECRETS_FILE=../../secrets.json go test --race --count=2 -v ./...
 }
 
 test_cover() {

@@ -1,17 +1,14 @@
-package routes
+package handler
 
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/rohitxdev/go-api-starter/internal/repo"
-)
-
-const (
-	sessionMaxAge = 86400 * 30 // 30 days
 )
 
 // bindAndValidate binds path params, query params and the request body into provided type `i` and validates provided `i`. `i` must be a pointer. The default binder binds body based on Content-Type header. Validator must be registered using `Echo#Validator`.
@@ -46,14 +43,14 @@ type response struct {
 	Message string `json:"message,omitempty"`
 }
 
-func createSession(c echo.Context, userId uint64) (*sessions.Session, error) {
+func createSession(c echo.Context, duration time.Duration, userId uint64) (*sessions.Session, error) {
 	sess, err := session.Get("session", c)
 	if err != nil {
 		return nil, err
 	}
 	sess.Options = &sessions.Options{
 		Path:     "/",
-		MaxAge:   sessionMaxAge,
+		MaxAge:   int(duration.Seconds()),
 		HttpOnly: true,
 	}
 	sess.Values["userId"] = userId

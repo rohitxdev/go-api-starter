@@ -1,4 +1,9 @@
 definitions:
+  handler.response:
+    properties:
+      message:
+        type: string
+    type: object
   repo.User:
     properties:
       accountStatus:
@@ -24,11 +29,6 @@ definitions:
       role:
         type: string
       updatedAt:
-        type: string
-    type: object
-  routes.response:
-    properties:
-      message:
         type: string
     type: object
 info:
@@ -90,6 +90,6 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.response'
+            $ref: '#/definitions/handler.response'
       summary: Ping
 swagger: "2.0"

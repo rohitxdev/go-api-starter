@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rohitxdev/go-api-starter/internal/database"
 	"github.com/rohitxdev/go-api-starter/internal/kvstore"
 	"github.com/stretchr/testify/assert"
 )
@@ -56,6 +57,6 @@ func TestKVStore(t *testing.T) {
 
 	t.Cleanup(func() {
 		kv.Close()
-		os.RemoveAll("db")
+		os.RemoveAll(database.DirName)
 	})
 }

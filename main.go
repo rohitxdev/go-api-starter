@@ -1,4 +1,4 @@
-//go:generate go run github.com/swaggo/swag/cmd/swag@latest init -q -g internal/routes/router.go
+//go:generate go run github.com/swaggo/swag/cmd/swag@latest init -q -g internal/handler/router.go
 package main
 
 import (
@@ -18,16 +18,16 @@ import (
 	"github.com/rohitxdev/go-api-starter/internal/config"
 	"github.com/rohitxdev/go-api-starter/internal/database"
 	"github.com/rohitxdev/go-api-starter/internal/email"
+	"github.com/rohitxdev/go-api-starter/internal/handler"
 	"github.com/rohitxdev/go-api-starter/internal/kvstore"
 	"github.com/rohitxdev/go-api-starter/internal/logger"
 	"github.com/rohitxdev/go-api-starter/internal/repo"
-	"github.com/rohitxdev/go-api-starter/internal/routes"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )
 
-//go:embed public templates docs
+//go:embed public templates
 var fs embed.FS
 
 func main() {
@@ -57,13 +57,6 @@ func main() {
 	if err != nil {
 		panic("Failed to connect to database: " + err.Error())
 	}
-	logr.Debug().Msg("Connected to database")
-	defer func() {
-		if err = db.Close(); err != nil {
-			panic("Failed to close database: " + err.Error())
-		}
-		logr.Debug().Msg("Database connection closed")
-	}()
 
 	//Connect to KV store
 	kv, err := kvstore.New("kv", time.Minute*5)
@@ -71,18 +64,11 @@ func main() {
 		panic("Failed to connect to KV store: " + err.Error())
 	}
 
-	logr.Debug().Msg("Connected to KV store")
-	defer func() {
-		kv.Close()
-		logr.Debug().Msg("KV store closed")
-	}()
-
 	// Create repo
 	r, err := repo.New(db)
 	if err != nil {
 		panic("Failed to create repo: " + err.Error())
 	}
-	defer r.Close()
 
 	bs, err := blobstore.New(cfg.S3Endpoint, cfg.S3DefaultRegion, cfg.AWSAccessKeyID, cfg.AWSAccessKeySecret)
 	if err != nil {
@@ -93,22 +79,26 @@ func main() {
 	if err != nil {
 		panic("Failed to parse email templates: " + err.Error())
 	}
-	emailer := email.New(&email.SMTPCredentials{
+
+	e := email.New(&email.SMTPCredentials{
 		Host:     cfg.SMTPHost,
 		Port:     cfg.SMTPPort,
 		Username: cfg.SMTPUsername,
 		Password: cfg.SMTPPassword,
 	}, emailTemplates)
 
-	e, err := routes.NewRouter(&routes.Services{
+	s := handler.Services{
 		BlobStore:  bs,
 		Config:     cfg,
 		EmbeddedFS: &fs,
-		Email:      emailer,
+		Email:      e,
 		KVStore:    kv,
 		Logger:     logr,
 		Repo:       r,
-	})
+	}
+	defer s.Close()
+
+	h, err := handler.New(&s)
 	if err != nil {
 		panic("Failed to create router: " + err.Error())
 	}
@@ -126,10 +116,11 @@ func main() {
 	//Start HTTP server
 	go func() {
 		// Stdlib supports HTTP/2 by default when serving over TLS, but has to be explicitly enabled otherwise.
-		handler := h2c.NewHandler(e, &http2.Server{})
+		handler := h2c.NewHandler(h, &http2.Server{})
 		if err := http.Serve(ls, handler); err != nil && !errors.Is(err, net.ErrClosed) {
 			panic("Failed to serve HTTP: " + err.Error())
 		}
+
 	}()
 
 	logr.Debug().Msg("HTTP server started")
@@ -145,7 +136,7 @@ func main() {
 	ctx, cancel = context.WithTimeout(ctx, cfg.ShutdownTimeout)
 	defer cancel()
 
-	if err := e.Shutdown(ctx); err != nil {
+	if err := h.Shutdown(ctx); err != nil {
 		panic("Failed to shutdown HTTP server: " + err.Error())
 	}
 

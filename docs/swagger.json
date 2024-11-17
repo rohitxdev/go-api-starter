@@ -91,7 +91,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.response"
+                            "$ref": "#/definitions/handler.response"
                         }
                     }
                 }
@@ -99,6 +99,14 @@
         }
     },
     "definitions": {
+        "handler.response": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
         "repo.User": {
             "type": "object",
             "properties": {
@@ -136,14 +144,6 @@
                     "type": "string"
                 },
                 "updatedAt": {
-                    "type": "string"
-                }
-            }
-        },
-        "routes.response": {
-            "type": "object",
-            "properties": {
-                "message": {
                     "type": "string"
                 }
             }

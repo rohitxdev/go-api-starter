@@ -102,7 +102,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.response"
+                            "$ref": "#/definitions/handler.response"
                         }
                     }
                 }
@@ -110,6 +110,14 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "handler.response": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
         "repo.User": {
             "type": "object",
             "properties": {
@@ -147,14 +155,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updatedAt": {
-                    "type": "string"
-                }
-            }
-        },
-        "routes.response": {
-            "type": "object",
-            "properties": {
-                "message": {
                     "type": "string"
                 }
             }

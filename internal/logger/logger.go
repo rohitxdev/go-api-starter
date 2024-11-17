@@ -10,8 +10,8 @@ import (
 )
 
 // New creates a new logger. If pretty is true, it will print the logs in a colorful, human-readable format. Pretty should only be used for development.
-func New(w io.Writer, pretty bool) *zerolog.Logger {
-	if pretty {
+func New(w io.Writer, isPretty bool) *zerolog.Logger {
+	if isPretty {
 		prettyWriter := zerolog.NewConsoleWriter(func(cw *zerolog.ConsoleWriter) {
 			cw.TimeFormat = time.Kitchen
 			cw.Out = w

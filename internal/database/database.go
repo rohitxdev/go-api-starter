@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	dirName = ".local"
+	DirName = ".local"
 )
 
 func createDirIfNotExists(path string) error {
@@ -34,10 +34,10 @@ func createDirIfNotExists(path string) error {
 // 'dbName' is the name of the database file. Pass :memory: for in-memory database.
 func NewSQLite(dbName string) (*sql.DB, error) {
 	if dbName != ":memory:" {
-		if err := createDirIfNotExists(dirName); err != nil {
+		if err := createDirIfNotExists(DirName); err != nil {
 			return nil, err
 		}
-		dbName = fmt.Sprintf("%s/%s.db", dirName, dbName)
+		dbName = fmt.Sprintf("%s/%s.db", DirName, dbName)
 	}
 
 	db, err := sql.Open("sqlite", dbName)

@@ -20,9 +20,9 @@ var (
 )
 
 type Config struct {
-	AppName    string `json:"appName" validate:"required"`
-	AppVersion string `json:"appVersion" validate:"required"`
-	BuildType  string `json:"buildType" validate:"required,oneof=debug release"`
+	AppName    string `json:"appName"`
+	AppVersion string `json:"appVersion"`
+	BuildType  string `json:"buildType"`
 	Env        string `json:"env" validate:"required,oneof=development production"`
 	// Host is the hostname of the server.
 	Host string `json:"host" validate:"required,ip"`
@@ -54,6 +54,9 @@ type Config struct {
 	AllowedOrigins []string `json:"allowedOrigins"`
 	// ShutdownTimeout is the duration after which the server will be shutdown gracefully.
 	ShutdownTimeout time.Duration `json:"shutdownTimeout" validate:"required"`
+	SessionDuration time.Duration `json:"sessionDuration" validate:"required"`
+	// LogInTokenExpiresIn is the duration after which the log-in token in email will expire.
+	LogInTokenExpiresIn time.Duration `json:"logInTokenExpiresIn" validate:"required"`
 	// SMTPPort is the port of the SMTP server.
 	SMTPPort int `json:"smtpPort" validate:"required"`
 	// IsDev is a flag indicating whether the server is running in development mode.
@@ -83,6 +86,12 @@ func Load() (*Config, error) {
 	m["port"] = os.Getenv("PORT")
 	if m["shutdownTimeout"], err = time.ParseDuration(m["shutdownTimeout"].(string)); err != nil {
 		errList = append(errList, fmt.Errorf("Failed to parse shutdown timeout: %w", err))
+	}
+	if m["sessionDuration"], err = time.ParseDuration(m["sessionDuration"].(string)); err != nil {
+		errList = append(errList, fmt.Errorf("Failed to parse session duration: %w", err))
+	}
+	if m["logInTokenExpiresIn"], err = time.ParseDuration(m["logInTokenExpiresIn"].(string)); err != nil {
+		errList = append(errList, fmt.Errorf("Failed to parse log in token expires in: %w", err))
 	}
 
 	if len(errList) > 0 {

@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStorageService(t *testing.T) {
+func TestBlobStore(t *testing.T) {
 	cfg, err := config.Load()
 	assert.Nil(t, err)
 

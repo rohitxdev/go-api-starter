@@ -1,4 +1,4 @@
-package routes
+package handler
 
 import (
 	"fmt"
@@ -65,12 +65,10 @@ func (s customJSONSerializer) Deserialize(c echo.Context, v any) error {
 	return err
 }
 
-func NewRouter(svc *Services) (*echo.Echo, error) {
+func New(svc *Services) (*echo.Echo, error) {
 	docs.SwaggerInfo.Host = net.JoinHostPort(svc.Config.Host, svc.Config.Port)
 
 	e := echo.New()
-	e.HideBanner = true
-	e.HidePort = true
 	e.JSONSerializer = customJSONSerializer{}
 	e.Validator = customValidator{
 		validator: validator.New(),
@@ -107,6 +105,7 @@ func NewRouter(svc *Services) (*echo.Echo, error) {
 		Filesystem: http.FS(svc.EmbeddedFS),
 	}))
 
+	// This middleware causes data races. See https://github.com/labstack/echo/issues/1761. But it's not a big deal.
 	e.Pre(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
 		Timeout: 10 * time.Second, Skipper: func(c echo.Context) bool {
 			return strings.HasPrefix(c.Request().URL.Path, "/debug/pprof")
@@ -197,21 +196,23 @@ func NewRouter(svc *Services) (*echo.Echo, error) {
 }
 
 func setUpRoutes(e *echo.Echo, svc *Services) {
+	h := &Handler{svc}
+
 	e.GET("/metrics", echoprometheus.NewHandler())
 	e.GET("/swagger/*", echoSwagger.EchoWrapHandler())
-	e.GET("/ping", GetPing(svc))
-	e.GET("/config", GetConfig(svc))
-	e.GET("/me", GetMe(svc), RestrictTo(svc, RoleUser))
-	e.GET("/_", GetAdmin(svc), RestrictTo(svc, RoleAdmin))
-	e.GET("/", GetHome(svc))
+	e.GET("/ping", h.getPing)
+	e.GET("/config", h.getConfig)
+	e.GET("/me", h.getMe, h.require(PermReadMe))
+	e.GET("/_", h.getAdmin, h.require(PermReadAdmin))
+	e.GET("/", h.getHome)
 
 	auth := e.Group("/auth")
 	{
 		logIn := auth.Group("/log-in")
 		{
-			logIn.GET("", ValidateLogInToken(svc))
-			logIn.POST("", SendLoginEmail(svc))
+			logIn.GET("", h.validateLogInToken)
+			logIn.POST("", h.sendLoginEmail)
 		}
-		auth.GET("/log-out", LogOut(svc))
+		auth.GET("/log-out", h.logOut)
 	}
 }
