@@ -53,8 +53,8 @@ type Headers struct {
 	Bcc         []string
 }
 
-// SendRaw sends an email with raw content of the specified MIME type.
-func (c *Client) SendRaw(headers *Headers, mimeType string, body string, attachments ...Attachment) error {
+// send sends an email with raw content of the specified MIME type.
+func (c *Client) send(headers *Headers, mimeType string, body string, attachments ...Attachment) error {
 	msg := gomail.NewMessage()
 	msg.SetHeaders(map[string][]string{
 		"From":    {msg.FormatAddress(headers.FromAddress, headers.FromName)},
@@ -88,7 +88,7 @@ func (c *Client) SendRaw(headers *Headers, mimeType string, body string, attachm
 	}
 
 	if err := c.dialer.DialAndSend(msg); err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
+		return fmt.Errorf("Failed to send email: %w", err)
 	}
 	return nil
 }
@@ -97,12 +97,13 @@ func (c *Client) SendRaw(headers *Headers, mimeType string, body string, attachm
 func (c *Client) SendHTML(headers *Headers, templateName string, data map[string]any, attachments ...Attachment) error {
 	var buf bytes.Buffer
 	if err := c.templates.ExecuteTemplate(&buf, templateName, data); err != nil {
-		return fmt.Errorf("failed to execute template %q: %w", templateName, err)
+		// '%q' prints the template name in quotes
+		return fmt.Errorf("Failed to execute template %q: %w", templateName, err)
 	}
-	return c.SendRaw(headers, "text/html", buf.String(), attachments...)
+	return c.send(headers, "text/html", buf.String(), attachments...)
 }
 
 // SendText sends a plain text email.
 func (c *Client) SendText(headers *Headers, body string, attachments ...Attachment) error {
-	return c.SendRaw(headers, "text/plain", body, attachments...)
+	return c.send(headers, "text/plain", body, attachments...)
 }
