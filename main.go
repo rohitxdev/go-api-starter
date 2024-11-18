@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"embed"
 	"errors"
 	"fmt"
 	"net"
@@ -11,7 +10,6 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"text/template"
 	"time"
 
 	"github.com/rohitxdev/go-api-starter/internal/blobstore"
@@ -26,9 +24,6 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )
-
-//go:embed public templates
-var fs embed.FS
 
 func main() {
 	if _, err := maxprocs.Set(); err != nil {
@@ -75,26 +70,23 @@ func main() {
 		panic("Failed to connect to S3 client: " + err.Error())
 	}
 
-	emailTemplates, err := template.ParseFS(fs, "templates/emails/*.tmpl")
-	if err != nil {
-		panic("Failed to parse email templates: " + err.Error())
-	}
-
-	e := email.New(&email.SMTPCredentials{
+	e, err := email.New(&email.SMTPCredentials{
 		Host:     cfg.SMTPHost,
 		Port:     cfg.SMTPPort,
 		Username: cfg.SMTPUsername,
 		Password: cfg.SMTPPassword,
-	}, emailTemplates)
+	})
+	if err != nil {
+		panic("Failed to create email client: " + err.Error())
+	}
 
 	s := handler.Services{
-		BlobStore:  bs,
-		Config:     cfg,
-		EmbeddedFS: &fs,
-		Email:      e,
-		KVStore:    kv,
-		Logger:     logr,
-		Repo:       r,
+		BlobStore: bs,
+		Config:    cfg,
+		Email:     e,
+		KVStore:   kv,
+		Logger:    logr,
+		Repo:      r,
 	}
 	defer s.Close()
 

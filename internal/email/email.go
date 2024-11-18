@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"text/template"
 
+	"github.com/rohitxdev/go-api-starter/assets"
 	"gopkg.in/gomail.v2"
 )
 
@@ -25,11 +26,16 @@ type Client struct {
 }
 
 // New creates a new email client with the provided credentials and templates.
-func New(c *SMTPCredentials, t *template.Template) *Client {
-	return &Client{
+func New(c *SMTPCredentials) (*Client, error) {
+	t, err := template.ParseFS(assets.FS, "templates/emails/*.tmpl")
+	if err != nil {
+		return nil, fmt.Errorf("Failed to parse email templates: %w", err)
+	}
+	client := Client{
 		dialer:    gomail.NewDialer(c.Host, c.Port, c.Username, c.Password),
 		templates: t,
 	}
+	return &client, nil
 }
 
 type Attachment struct {

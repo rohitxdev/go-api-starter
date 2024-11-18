@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"embed"
 	"fmt"
 
 	"github.com/rohitxdev/go-api-starter/internal/blobstore"
@@ -13,13 +12,12 @@ import (
 )
 
 type Services struct {
-	BlobStore  *blobstore.Store
-	Config     *config.Config
-	EmbeddedFS *embed.FS
-	Email      *email.Client
-	KVStore    *kvstore.Store
-	Logger     *zerolog.Logger
-	Repo       *repo.Repo
+	BlobStore *blobstore.Store
+	Config    *config.Config
+	Email     *email.Client
+	KVStore   *kvstore.Store
+	Logger    *zerolog.Logger
+	Repo      *repo.Repo
 }
 
 func (s *Services) Close() error {

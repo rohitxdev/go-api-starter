@@ -2,14 +2,12 @@ package handler_test
 
 import (
 	"bytes"
-	"embed"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"testing"
-	"text/template"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -99,14 +97,16 @@ func TestRootRoutes(t *testing.T) {
 	if err != nil {
 		panic("Failed to connect to S3 client: " + err.Error())
 	}
+	e, err := email.New(&email.SMTPCredentials{})
+	assert.Nil(t, err)
 
-	e, err := handler.New(&handler.Services{
-		BlobStore:  bs,
-		Config:     cfg,
-		KVStore:    kv,
-		Logger:     logr,
-		Repo:       r,
-		EmbeddedFS: &embed.FS{}, Email: email.New(&email.SMTPCredentials{}, &template.Template{}),
+	h, err := handler.New(&handler.Services{
+		BlobStore: bs,
+		Config:    cfg,
+		KVStore:   kv,
+		Logger:    logr,
+		Repo:      r,
+		Email:     e,
 	})
 	assert.Nil(t, err)
 
@@ -117,7 +117,7 @@ func TestRootRoutes(t *testing.T) {
 		})
 		assert.Nil(t, err)
 		res := httptest.NewRecorder()
-		e.ServeHTTP(res, req)
+		h.ServeHTTP(res, req)
 		assert.Equal(t, http.StatusOK, res.Code)
 	})
 
@@ -128,7 +128,7 @@ func TestRootRoutes(t *testing.T) {
 		})
 		assert.Nil(t, err)
 		res := httptest.NewRecorder()
-		e.ServeHTTP(res, req)
+		h.ServeHTTP(res, req)
 		assert.Equal(t, http.StatusOK, res.Code)
 	})
 
@@ -139,7 +139,7 @@ func TestRootRoutes(t *testing.T) {
 		})
 		assert.Nil(t, err)
 		res := httptest.NewRecorder()
-		e.ServeHTTP(res, req)
+		h.ServeHTTP(res, req)
 		assert.Equal(t, http.StatusOK, res.Code)
 	})
 }

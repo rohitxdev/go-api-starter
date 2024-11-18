@@ -18,6 +18,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/oklog/ulid/v2"
+	"github.com/rohitxdev/go-api-starter/assets"
 	"github.com/rohitxdev/go-api-starter/docs"
 	"github.com/rohitxdev/go-api-starter/internal/repo"
 	echoSwagger "github.com/swaggo/echo-swagger"
@@ -79,7 +80,7 @@ func New(svc *Services) (*echo.Echo, error) {
 		echo.TrustPrivateNet(false), // e.g. ipv4 start with 10. or 192.168
 	)
 
-	pageTemplates, err := template.ParseFS(svc.EmbeddedFS, "templates/pages/*.tmpl")
+	pageTemplates, err := template.ParseFS(assets.FS, "templates/pages/*.tmpl")
 	if err != nil {
 		return nil, fmt.Errorf("could not parse templates: %w", err)
 	}
@@ -102,7 +103,7 @@ func New(svc *Services) (*echo.Echo, error) {
 
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
 		Root:       "public",
-		Filesystem: http.FS(svc.EmbeddedFS),
+		Filesystem: http.FS(assets.FS),
 	}))
 
 	// This middleware causes data races. See https://github.com/labstack/echo/issues/1761. But it's not a big deal.
