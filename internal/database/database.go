@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	DirName = ".local"
+	DirName = ".sqlite"
 )
 
 func createDirIfNotExists(path string) error {
