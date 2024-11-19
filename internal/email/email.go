@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"text/template"
 
+	"github.com/oklog/ulid/v2"
 	"github.com/rohitxdev/go-api-starter/assets"
 	"gopkg.in/gomail.v2"
 )
@@ -51,17 +52,23 @@ type Headers struct {
 	ToAddresses []string
 	Cc          []string
 	Bcc         []string
+	// Prevent email stacking in the same thread on the email client.
+	NoStack bool
 }
 
-// send sends an email with raw content of the specified MIME type.
+// 'send' sends an email with raw content of the specified MIME type.
 func (c *Client) send(headers *Headers, mimeType string, body string, attachments ...Attachment) error {
 	msg := gomail.NewMessage()
+
 	msg.SetHeaders(map[string][]string{
 		"From":    {msg.FormatAddress(headers.FromAddress, headers.FromName)},
 		"Subject": {headers.Subject},
 		"To":      headers.ToAddresses,
 	})
 
+	if headers.NoStack {
+		msg.SetHeader("X-Entity-Ref-ID", ulid.Make().String())
+	}
 	if len(headers.Cc) > 0 {
 		msg.SetHeader("Cc", headers.Cc...)
 	}
