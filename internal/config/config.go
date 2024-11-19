@@ -24,27 +24,23 @@ type Config struct {
 	AppVersion string `json:"appVersion"`
 	BuildType  string `json:"buildType"`
 	Env        string `json:"env" validate:"required,oneof=development production"`
-	// Host is the hostname of the server.
-	Host string `json:"host" validate:"required,ip"`
-	// Port is the port of the server.
-	Port string `json:"port" validate:"required,gte=0"`
-	// DatabaseURL is the URL of the database.
+	Host       string `json:"host" validate:"required,ip"`
+	Port       string `json:"port" validate:"required,gte=0"`
+	// DatabaseURL is the connection string of the database.
 	DatabaseURL  string `json:"databaseUrl" validate:"required"`
 	SMTPHost     string `json:"smtpHost" validate:"required"`
 	SMTPUsername string `json:"smtpUsername" validate:"required"`
 	SMTPPassword string `json:"smtpPassword" validate:"required"`
 	// SenderEmail is the email address from which emails will be sent.
-	SenderEmail        string `json:"senderEmail" validate:"required"`
-	S3BucketName       string `json:"s3BucketName"`
-	S3Endpoint         string `json:"s3Endpoint"`
-	S3DefaultRegion    string `json:"s3DefaultRegion"`
-	AWSAccessKeyID     string `json:"awsAccessKeyId"`
-	AWSAccessKeySecret string `json:"awsAccessKeySecret"`
-	// GoogleOAuth2Config is the configuration for Google OAuth2 authentication.
+	SenderEmail        string         `json:"senderEmail" validate:"required"`
+	S3BucketName       string         `json:"s3BucketName"`
+	S3Endpoint         string         `json:"s3Endpoint"`
+	S3DefaultRegion    string         `json:"s3DefaultRegion"`
+	AWSAccessKeyID     string         `json:"awsAccessKeyId"`
+	AWSAccessKeySecret string         `json:"awsAccessKeySecret"`
 	GoogleOAuth2Config *oauth2.Config `json:"googleOAuth2Config"`
 	// GoogleClientID is the client ID for Google OAuth2 authentication.
-	GoogleClientID string `json:"googleClientId"`
-	// GoogleClientSecret is the client secret for Google OAuth2 authentication.
+	GoogleClientID     string `json:"googleClientId"`
 	GoogleClientSecret string `json:"googleClientSecret"`
 	// SessionSecret is the secret key used to sign session cookies.
 	SessionSecret string `json:"sessionSecret" validate:"required"`
@@ -52,7 +48,7 @@ type Config struct {
 	JWTSecret string `json:"jwtSecret" validate:"required"`
 	// AllowedOrigins is a list of origins that are allowed to access the API.
 	AllowedOrigins []string `json:"allowedOrigins"`
-	// ShutdownTimeout is the duration after which the server will be shutdown gracefully.
+	// ShutdownTimeout is the duration after which the server will be shutdown forcefully.
 	ShutdownTimeout time.Duration `json:"shutdownTimeout" validate:"required"`
 	SessionDuration time.Duration `json:"sessionDuration" validate:"required"`
 	// LogInTokenExpiresIn is the duration after which the log-in token in email will expire.
