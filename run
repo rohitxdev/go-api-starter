@@ -7,7 +7,7 @@ set -o allexport
 
 ENV_FILE="${ENV_FILE:-".env"}"
 # shellcheck disable=SC1090
-[[ -r $ENV_FILE ]] && source "$ENV_FILE"
+[[ -r "$ENV_FILE" ]] && source "$ENV_FILE"
 
 PACKAGE_NAME=$(awk '/^module/ { print $2 }' go.mod)
 APP_NAME="$(basename "$PACKAGE_NAME")"
@@ -99,8 +99,8 @@ watch() {
 
     print loading "Starting development server"
     # build.kill_delay is in nanoseconds
-    air --tmp_dir="$tmp_dir" --build.cmd "$build_cmd" --build.bin "$tmp_dir/main" --build.delay 0 --build.kill_delay 10000000000 \
-        --build.include_ext "go,tmpl" --build.send_interrupt true --log.main_only true
+    air --tmp_dir="$tmp_dir" --build.cmd "$build_cmd" --build.bin "source $ENV_FILE; $tmp_dir/main" --build.delay 0 --build.kill_delay 10000000000 \
+        --build.include_ext "go,tmpl,env" --build.send_interrupt true --log.main_only true
 }
 
 build() {
