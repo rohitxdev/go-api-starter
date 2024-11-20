@@ -7,6 +7,7 @@ import (
 )
 
 func main() {
+	// Set max threads to match the Linux container CPU quota.
 	if _, err := maxprocs.Set(); err != nil {
 		panic("Failed to set maxprocs: " + err.Error())
 	}
