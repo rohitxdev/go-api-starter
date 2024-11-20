@@ -20,10 +20,10 @@ func createDirIfNotExists(path string) error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			if err = os.Mkdir(path, 0755); err != nil {
-				return fmt.Errorf("could not create directory: %w", err)
+				return fmt.Errorf("Failed to create directory: %w", err)
 			}
 		} else {
-			return fmt.Errorf("could not get stats of directory: %w", err)
+			return fmt.Errorf("Failed to get stats of directory: %w", err)
 		}
 	} else if !info.IsDir() {
 		return fmt.Errorf("%s is not a directory", path)
@@ -42,7 +42,7 @@ func NewSQLite(dbName string) (*sql.DB, error) {
 
 	db, err := sql.Open("sqlite", dbName)
 	if err != nil {
-		return nil, fmt.Errorf("could not open sqlite database: %w", err)
+		return nil, fmt.Errorf("Failed to open sqlite database: %w", err)
 	}
 
 	stmts := [...]string{
@@ -67,7 +67,7 @@ func NewSQLite(dbName string) (*sql.DB, error) {
 	}
 
 	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("could not ping sqlite database: %w", err)
+		return nil, fmt.Errorf("Failed to ping sqlite database: %w", err)
 	}
 
 	return db, nil

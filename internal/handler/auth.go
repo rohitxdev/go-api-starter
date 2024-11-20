@@ -125,12 +125,6 @@ func (h *Handler) sendLoginEmail(c echo.Context) error {
 		return fmt.Errorf("Failed to generate login token: %w", err)
 	}
 
-	emailHeaders := &email.Headers{
-		Subject:     "Log In to Your Account",
-		ToAddresses: []string{req.Email},
-		FromAddress: h.Config.SenderEmail,
-		FromName:    "The App",
-	}
 	protocol := "http"
 	if c.IsTLS() {
 		protocol = "https"
@@ -139,9 +133,16 @@ func (h *Handler) sendLoginEmail(c echo.Context) error {
 		"loginURL":     fmt.Sprintf("%s://%s%s?token=%s", protocol, host, c.Path(), token),
 		"validMinutes": h.Config.LogInTokenExpiresIn.Minutes(),
 	}
-	if err = h.Email.SendHTML(emailHeaders, "login.tmpl", emailData); err != nil {
+	emailOpts := email.BaseOpts{
+		Subject:     "Log In to Your Account",
+		ToAddresses: []string{req.Email},
+		FromAddress: h.Config.SenderEmail,
+		FromName:    "The App",
+	}
+	if err = h.Email.SendHTML(&emailOpts, "login.tmpl", emailData); err != nil {
 		return fmt.Errorf("Failed to send email: %w", err)
 	}
+
 	return c.JSON(http.StatusOK, response{Message: "Login link sent to " + req.Email})
 }
 func fingerprintUser(IP string, userAgent string) string {

@@ -45,35 +45,39 @@ type Attachment struct {
 	Data        []byte
 }
 
-type Headers struct {
-	Subject     string
-	FromAddress string
-	FromName    string
-	ToAddresses []string
-	Cc          []string
-	Bcc         []string
+type BaseOpts struct {
+	Subject         string
+	FromAddress     string
+	FromName        string
+	UnsubscribeLink string
+	ToAddresses     []string
+	Cc              []string
+	Bcc             []string
 	// Prevent email stacking in the same thread on the email client.
 	NoStack bool
 }
 
 // 'send' sends an email with raw content of the specified MIME type.
-func (c *Client) send(headers *Headers, mimeType string, body string, attachments ...Attachment) error {
+func (c *Client) send(opts *BaseOpts, mimeType string, body string, attachments ...Attachment) error {
 	msg := gomail.NewMessage()
 
 	msg.SetHeaders(map[string][]string{
-		"From":    {msg.FormatAddress(headers.FromAddress, headers.FromName)},
-		"Subject": {headers.Subject},
-		"To":      headers.ToAddresses,
+		"From":    {msg.FormatAddress(opts.FromAddress, opts.FromName)},
+		"Subject": {opts.Subject},
+		"To":      opts.ToAddresses,
 	})
 
-	if headers.NoStack {
+	if opts.NoStack {
 		msg.SetHeader("X-Entity-Ref-ID", ulid.Make().String())
 	}
-	if len(headers.Cc) > 0 {
-		msg.SetHeader("Cc", headers.Cc...)
+	if opts.UnsubscribeLink != "" {
+		msg.SetHeader("List-Unsubscribe", opts.UnsubscribeLink)
 	}
-	if len(headers.Bcc) > 0 {
-		msg.SetHeader("Bcc", headers.Bcc...)
+	if len(opts.Cc) > 0 {
+		msg.SetHeader("Cc", opts.Cc...)
+	}
+	if len(opts.Bcc) > 0 {
+		msg.SetHeader("Bcc", opts.Bcc...)
 	}
 
 	msg.SetBody(mimeType, body)
@@ -101,16 +105,16 @@ func (c *Client) send(headers *Headers, mimeType string, body string, attachment
 }
 
 // SendHtml sends an HTML email using a template.
-func (c *Client) SendHTML(headers *Headers, templateName string, data map[string]any, attachments ...Attachment) error {
+func (c *Client) SendHTML(opts *BaseOpts, templateName string, data map[string]any, attachments ...Attachment) error {
 	var buf bytes.Buffer
 	if err := c.templates.ExecuteTemplate(&buf, templateName, data); err != nil {
 		// '%q' prints the template name in quotes
 		return fmt.Errorf("Failed to execute template %q: %w", templateName, err)
 	}
-	return c.send(headers, "text/html", buf.String(), attachments...)
+	return c.send(opts, "text/html", buf.String(), attachments...)
 }
 
 // SendText sends a plain text email.
-func (c *Client) SendText(headers *Headers, body string, attachments ...Attachment) error {
-	return c.send(headers, "text/plain", body, attachments...)
+func (c *Client) SendText(opts *BaseOpts, body string, attachments ...Attachment) error {
+	return c.send(opts, "text/plain", body, attachments...)
 }
