@@ -20,7 +20,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/rohitxdev/go-api-starter/assets"
 	"github.com/rohitxdev/go-api-starter/docs"
-	"github.com/rohitxdev/go-api-starter/internal/repo"
+	"github.com/rohitxdev/go-api-starter/repo"
 	echoSwagger "github.com/swaggo/echo-swagger"
 )
 

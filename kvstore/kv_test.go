@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rohitxdev/go-api-starter/internal/database"
-	"github.com/rohitxdev/go-api-starter/internal/kvstore"
+	"github.com/rohitxdev/go-api-starter/database"
+	"github.com/rohitxdev/go-api-starter/kvstore"
 	"github.com/stretchr/testify/assert"
 )
 

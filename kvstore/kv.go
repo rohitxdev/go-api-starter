@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/rohitxdev/go-api-starter/internal/database"
+	"github.com/rohitxdev/go-api-starter/database"
 )
 
 var (

@@ -9,8 +9,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/rohitxdev/go-api-starter/internal/blobstore"
-	"github.com/rohitxdev/go-api-starter/internal/config"
+	"github.com/rohitxdev/go-api-starter/blobstore"
+	"github.com/rohitxdev/go-api-starter/config"
 	"github.com/stretchr/testify/assert"
 )
 

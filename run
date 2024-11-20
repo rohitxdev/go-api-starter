@@ -95,7 +95,7 @@ docker_push() {
 
 watch() {
     local tmp_dir=".tmp"
-    local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/internal/config.AppName=$APP_NAME -X $PACKAGE_NAME/internal/config.AppVersion=$APP_VERSION -X $PACKAGE_NAME/internal/config.BuildType=debug\" --race -o $tmp_dir/main  ."
+    local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/config.AppName=$APP_NAME -X $PACKAGE_NAME/config.AppVersion=$APP_VERSION -X $PACKAGE_NAME/config.BuildType=debug\" --race -o $tmp_dir/main  ."
 
     print loading "Starting development server"
     # build.kill_delay is in nanoseconds
@@ -105,7 +105,7 @@ watch() {
 
 build() {
     local build_cmd="CGO_ENABLED=0 go build \
-        -ldflags='-s -w -X $PACKAGE_NAME/internal/config.AppName=$APP_NAME -X $PACKAGE_NAME/internal/config.AppVersion=$APP_VERSION -X $PACKAGE_NAME/internal/config.BuildType=release -extldflags \"-static\"' \
+        -ldflags='-s -w -X $PACKAGE_NAME/config.AppName=$APP_NAME -X $PACKAGE_NAME/config.AppVersion=$APP_VERSION -X $PACKAGE_NAME/config.BuildType=release -extldflags \"-static\"' \
         --trimpath -o $build_path ."
 
     print loading "Verifying go.mod"

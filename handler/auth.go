@@ -9,10 +9,10 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
-	"github.com/rohitxdev/go-api-starter/internal/auth"
-	"github.com/rohitxdev/go-api-starter/internal/cryptoutil"
-	"github.com/rohitxdev/go-api-starter/internal/email"
-	"github.com/rohitxdev/go-api-starter/internal/repo"
+	"github.com/rohitxdev/go-api-starter/auth"
+	"github.com/rohitxdev/go-api-starter/cryptoutil"
+	"github.com/rohitxdev/go-api-starter/email"
+	"github.com/rohitxdev/go-api-starter/repo"
 )
 
 func (h *Handler) logOut(c echo.Context) error {

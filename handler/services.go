@@ -3,11 +3,11 @@ package handler
 import (
 	"fmt"
 
-	"github.com/rohitxdev/go-api-starter/internal/blobstore"
-	"github.com/rohitxdev/go-api-starter/internal/config"
-	"github.com/rohitxdev/go-api-starter/internal/email"
-	"github.com/rohitxdev/go-api-starter/internal/kvstore"
-	"github.com/rohitxdev/go-api-starter/internal/repo"
+	"github.com/rohitxdev/go-api-starter/blobstore"
+	"github.com/rohitxdev/go-api-starter/config"
+	"github.com/rohitxdev/go-api-starter/email"
+	"github.com/rohitxdev/go-api-starter/kvstore"
+	"github.com/rohitxdev/go-api-starter/repo"
 	"github.com/rs/zerolog"
 )
 
