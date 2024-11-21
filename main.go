@@ -3,14 +3,9 @@ package main
 
 import (
 	"github.com/rohitxdev/go-api-starter/app"
-	"go.uber.org/automaxprocs/maxprocs"
 )
 
 func main() {
-	// Set max threads to match the Linux container CPU quota.
-	if _, err := maxprocs.Set(); err != nil {
-		panic("Failed to set maxprocs: " + err.Error())
-	}
 	if err := app.Run(); err != nil {
 		panic(err)
 	}

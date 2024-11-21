@@ -19,11 +19,16 @@ import (
 	"github.com/rohitxdev/go-api-starter/kvstore"
 	"github.com/rohitxdev/go-api-starter/logger"
 	"github.com/rohitxdev/go-api-starter/repo"
+	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )
 
 func Run() error {
+	// Set max threads to match the Linux container CPU quota.
+	if _, err := maxprocs.Set(); err != nil {
+		panic("Failed to set maxprocs: " + err.Error())
+	}
 	//Load config
 	cfg, err := config.Load()
 	if err != nil {
