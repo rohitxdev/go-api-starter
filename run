@@ -184,8 +184,11 @@ checkpoint() {
         print "Quitting"
         return 1
     fi
-    clean
-    if ! (git add . && git commit -m "Checkpoint - $(date -u)" && git push); then
+    read -p "Commit message (Leave empty to use default): " -r msg
+    if [[ -z "$msg" ]]; then
+        msg="Checkpoint - $(date -u)"
+    fi
+    if ! (git add . && git commit -m "$msg" && git push); then
         print error "Failed to create checkpoint"
         return 1
     fi
