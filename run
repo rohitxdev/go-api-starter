@@ -25,7 +25,7 @@ prompt() {
 }
 
 print() {
-    declare -A colors=(["debug"]="30" ["loading"]="37" ["info"]="34" ["success"]="32" ["warn"]="33" ["error"]="31")
+    declare -A colors=(["debug"]="30" ["loading"]="30" ["info"]="34" ["success"]="32" ["warn"]="33" ["error"]="31")
     local prefix
     local suffix
 
@@ -53,7 +53,7 @@ print() {
 
 # Run live development server in docker
 docker_watch() {
-    local compose_file="docker-compose.yaml"
+    local compose_file="compose.yaml"
     docker compose -f "$compose_file" down --remove-orphans
     docker compose -f "$compose_file" rm --force
     docker compose -f "$compose_file" up --build
@@ -62,13 +62,12 @@ docker_watch() {
 repo="$(echo "$PACKAGE_NAME" | cut -d '/' -f 2-)"
 readonly repo
 readonly tag="$APP_VERSION"
-readonly build_path="./bin/main"
+readonly build_file_name="main"
+readonly build_file_path="./bin/$build_file_name"
 readonly image_name="$repo:$tag"
 
 docker_build() {
-    if docker images | grep "$repo:$tag" >/dev/null; then
-        docker rmi "$repo:$tag" --force
-    fi
+    docker images | grep "$repo:$tag" >/dev/null && docker rmi "$repo:$tag" --force
     docker buildx build --platform linux/amd64,linux/arm64 --tag "$image_name" --target production --build-arg BASE_IMAGE_TAG="$BASE_IMAGE_TAG" .
     echo
     print info "Image: $image_name"
@@ -95,42 +94,34 @@ docker_push() {
 
 watch() {
     local tmp_dir=".tmp"
-    local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/config.AppName=$APP_NAME -X $PACKAGE_NAME/config.AppVersion=$APP_VERSION -X $PACKAGE_NAME/config.BuildType=debug\" --race -o $tmp_dir/main  ."
+    local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/config.AppName=$APP_NAME -X $PACKAGE_NAME/config.AppVersion=$APP_VERSION -X $PACKAGE_NAME/config.BuildType=debug\" --race -o $tmp_dir/$build_file_name  ."
 
     print loading "Starting development server"
     # build.kill_delay is in nanoseconds
-    air --tmp_dir="$tmp_dir" --build.cmd "$build_cmd" --build.bin "source $ENV_FILE; $tmp_dir/main" --build.delay 0 --build.kill_delay 10000000000 \
+    air --tmp_dir="$tmp_dir" --build.cmd "$build_cmd" --build.bin "source $ENV_FILE; $tmp_dir/$build_file_name" --build.delay 0 --build.kill_delay 10000000000 \
         --build.include_ext "go,tmpl,env" --build.send_interrupt true --log.main_only true
 }
 
 build() {
     local build_cmd="CGO_ENABLED=0 go build \
         -ldflags='-s -w -X $PACKAGE_NAME/config.AppName=$APP_NAME -X $PACKAGE_NAME/config.AppVersion=$APP_VERSION -X $PACKAGE_NAME/config.BuildType=release -extldflags \"-static\"' \
-        --trimpath -o $build_path ."
+        --trimpath -o $build_file_path ."
 
-    print loading "Verifying go.mod"
+    print loading "Verifying modules"
     if ! go mod verify &>/dev/null; then
-        print error "Go mod verification failed"
+        print error "Modules verification failed"
         return 1
     fi
 
     print loading "Building app"
-
-    if go generate ./...; then
-        print success "OpenAPI docs generated"
-    else
-        print error "Failed to generate OpenAPI docs"
-        return 1
-    fi
-
-    if ! eval "$build_cmd"; then
+    if ! go generate ./... && eval "$build_cmd"; then
         print error "Build failed"
         return 1
     fi
 
-    if file "$build_path" | grep "dynamically linked" >/dev/null; then
+    if file "$build_file_path" | grep "dynamically linked" >/dev/null; then
         print error "Build binary is still dynamically linked"
-        file "$build_path"
+        file "$build_file_path"
         return 1
     fi
 
@@ -139,11 +130,11 @@ build() {
 }
 
 start() {
-    if [[ ! -x "$build_path" ]]; then
-        print error "Build not found."
+    if [[ ! -x "$build_file_path" ]]; then
+        print error "Build not found"
         return 1
     fi
-    "$build_path"
+    "$build_file_path"
 }
 
 test() {
@@ -162,36 +153,27 @@ benchmark() {
     SECRETS_FILE=../../secrets.json go test --race --count=2 -v --benchmem --bench=. ./...
 }
 
-clean() {
-    print loading "Cleaning"
-    go mod tidy -v
-    go clean --cache
-    rm -rf ./bin ./.tmp
-    print success "Cleaned up"
-}
-
 pprof() {
     print loading "Generating pprof profile"
-    if [[ -z "$PORT" ]]; then
-        print error "PORT is not set"
-        return 1
-    fi
+    [[ -z "$PORT" ]] && print error "PORT is not set" && return 1
     curl "http://localhost:${PORT}/debug/pprof/profile?seconds=30" >default.pgo && print success "Pprof profile generated"
 }
 
 checkpoint() {
-    if (! prompt "Create git checkpoint and push changes to origin?") || (! build && ! prompt "Still continue?"); then
+    prompt "Create git checkpoint and push changes to origin?" || return 1
+    if ! build && ! prompt "Still continue?"; then
         print "Quitting"
         return 1
     fi
-    read -p "Commit message (Leave empty to use default): " -r msg
-    if [[ -z "$msg" ]]; then
-        msg="Checkpoint - $(date -u)"
-    fi
-    if ! (git add . && git commit -m "$msg" && git push); then
+
+    read -p "Commit message (optional): " -r msg
+
+    git add --all
+    if ! git commit -m "${msg:-Checkpoint - $(date -u)}" && git push; then
         print error "Failed to create checkpoint"
         return 1
     fi
+
     print success "Checkpoint created"
 }
 
@@ -202,7 +184,7 @@ upgrade() {
         return 1
     fi
     print success "Upgraded minor/patch versions of packages"
-    print debug "To upgrade major versions, run 'go get -u <package>@<version>' for each package manually"
+    print info "To upgrade major versions, run 'go get -u <package>@<version>' for each package manually"
 }
 
 print_menu() {
@@ -211,13 +193,11 @@ print_menu() {
 ➤ watch        - Run live development server
 ➤ build        - Build go app for production release and generate OpenAPI docs
 ➤ start        - Run go app binary
-➤ docker.watch - Run live development server in docker
-➤ docker.build - Build the Docker image for production
-➤ docker.push  - Push the production docker image to registry
-➤ test         - Run tests
-➤ test.cover   - Run tests and show coverage report
+➤ docker-watch - Run live development server in docker
+➤ docker-build - Build the Docker image for production
+➤ docker-push  - Push the production docker image to registry
+➤ test         - Run tests (pass --cover to show coverage report)
 ➤ benchmark    - Run benchmarks
-➤ clean        - Clean go mod & cache & remove build artifacts
 ➤ checkpoint   - Create a git checkpoint and push changes to origin
 ➤ pprof        - Start pprof profile
 ➤ upgrade      - Upgrade dependencies
@@ -235,26 +215,24 @@ case "$1" in
 "start")
     start
     ;;
-"docker.watch")
+"docker-watch")
     docker_watch
     ;;
-"docker.build")
+"docker-build")
     docker_build
     ;;
-"docker.push")
+"docker-push")
     docker_push
     ;;
 "test")
-    test
-    ;;
-"test.cover")
-    test_cover
+    if [[ "$2" == "--cover" ]]; then
+        test_cover
+    else
+        test
+    fi
     ;;
 "benchmark")
     benchmark
-    ;;
-"clean")
-    clean
     ;;
 "checkpoint")
     checkpoint

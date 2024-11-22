@@ -25,18 +25,18 @@ import (
 )
 
 func Run() error {
-	// Set max threads to match the Linux container CPU quota.
+	// Set GOMAXPROCS to match the Linux container CPU quota.
 	if _, err := maxprocs.Set(); err != nil {
 		return fmt.Errorf("Failed to set maxprocs: %w", err)
 	}
 
-	//Load config
+	//Load config.
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("Failed to load config: %w", err)
 	}
 
-	//Set up logger
+	//Set up logger.
 	logr := logger.New(os.Stderr, cfg.IsDev)
 
 	logr.Debug().
@@ -47,19 +47,19 @@ func Run() error {
 		Str("platform", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)).
 		Msg("Running " + cfg.AppName)
 
-	//Connect to postgres database
+	//Connect to postgres database.
 	db, err := database.NewPostgreSQL(cfg.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to database: %w", err)
 	}
 
-	//Connect to KV store
+	//Connect to KV store.
 	kv, err := kvstore.New("kv", time.Minute*5)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to KV store: %w", err)
 	}
 
-	// Create repo
+	// Create repo.
 	r, err := repo.New(db)
 	if err != nil {
 		return fmt.Errorf("Failed to create repo: %w", err)
@@ -97,7 +97,7 @@ func Run() error {
 
 	errCh := make(chan error)
 	address := net.JoinHostPort(cfg.Host, cfg.Port)
-	//Start HTTP server
+	//Start HTTP server.
 	go func() {
 		// Stdlib supports HTTP/2 by default when serving over TLS, but has to be explicitly enabled otherwise.
 		h2Handler := h2c.NewHandler(h, &http2.Server{})
@@ -107,7 +107,7 @@ func Run() error {
 	logr.Info().Msg(fmt.Sprintf("Server is listening on http://%s", address))
 
 	ctx := context.Background()
-	//Shut down HTTP server gracefully
+	//Shut down HTTP server gracefully.
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
 
