@@ -1,4 +1,4 @@
-//go:generate go run github.com/swaggo/swag/cmd/swag@latest init -q -g handler/router.go
+//go:generate go run github.com/swaggo/swag/cmd/swag@latest init -q -g handler/handler.go
 package main
 
 import (
