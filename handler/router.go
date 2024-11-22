@@ -201,7 +201,6 @@ func setUpRoutes(e *echo.Echo, svc *Services) {
 
 	e.GET("/metrics", echoprometheus.NewHandler())
 	e.GET("/swagger/*", echoSwagger.EchoWrapHandler())
-	e.GET("/ping", h.getPing)
 	e.GET("/config", h.getConfig)
 	e.GET("/me", h.getMe, h.require(PermReadMe))
 	e.GET("/_", h.getAdmin, h.require(PermReadAdmin))

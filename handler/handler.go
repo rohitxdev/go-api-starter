@@ -18,14 +18,6 @@ func (h *Handler) getHome(c echo.Context) error {
 	return c.Render(http.StatusOK, "home.tmpl", nil)
 }
 
-// @Summary Ping
-// @Description Ping the server.
-// @Router /ping [get]
-// @Success 200 {object} response
-func (h *Handler) getPing(c echo.Context) error {
-	return c.JSON(http.StatusOK, response{Message: "pong"})
-}
-
 // @Summary Get config
 // @Description Get client config.
 // @Router /config [get]
