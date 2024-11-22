@@ -93,31 +93,9 @@ const docTemplate = `{
                     }
                 }
             }
-        },
-        "/ping": {
-            "get": {
-                "description": "Ping the server.",
-                "summary": "Ping",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.response"
-                        }
-                    }
-                }
-            }
         }
     },
     "definitions": {
-        "handler.response": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string"
-                }
-            }
-        },
         "repo.User": {
             "type": "object",
             "properties": {

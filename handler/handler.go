@@ -39,7 +39,7 @@ func (h *Handler) getConfig(c echo.Context) error {
 // @Success 200 {string} string "Admin page"
 // @Failure 401 {string} string "invalid session"
 func (h *Handler) getAdmin(c echo.Context) error {
-	return c.String(http.StatusOK, "Admin page")
+	return c.JSON(http.StatusOK, response{Message: "You're an admin."})
 }
 
 // @Summary Get user
@@ -51,7 +51,7 @@ func (h *Handler) getAdmin(c echo.Context) error {
 func (h *Handler) getMe(c echo.Context) error {
 	user := getUser(c)
 	if user == nil {
-		return echo.NewHTTPError(http.StatusUnauthorized, "User is not logged in")
+		return c.JSON(http.StatusUnauthorized, response{Message: "User is not logged in."})
 	}
 	return c.JSON(http.StatusOK, user)
 }

@@ -1,9 +1,4 @@
 definitions:
-  handler.response:
-    properties:
-      message:
-        type: string
-    type: object
   repo.User:
     properties:
       accountStatus:
@@ -83,13 +78,4 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get user
-  /ping:
-    get:
-      description: Ping the server.
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.response'
-      summary: Ping
 swagger: "2.0"
