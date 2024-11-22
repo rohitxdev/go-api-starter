@@ -27,8 +27,9 @@ import (
 func Run() error {
 	// Set max threads to match the Linux container CPU quota.
 	if _, err := maxprocs.Set(); err != nil {
-		panic("Failed to set maxprocs: " + err.Error())
+		return fmt.Errorf("Failed to set maxprocs: %w", err)
 	}
+
 	//Load config
 	cfg, err := config.Load()
 	if err != nil {
@@ -91,42 +92,39 @@ func Run() error {
 
 	h, err := handler.New(&s)
 	if err != nil {
-		return fmt.Errorf("Failed to create router: %w", err)
+		return fmt.Errorf("Failed to create HTTP handler: %w", err)
 	}
 
-	ls, err := net.Listen("tcp", net.JoinHostPort(cfg.Host, cfg.Port))
-	if err != nil {
-		return fmt.Errorf("Failed to listen on TCP: %w", err)
-	}
-	defer ls.Close()
-
+	errCh := make(chan error)
+	address := net.JoinHostPort(cfg.Host, cfg.Port)
 	//Start HTTP server
 	go func() {
 		// Stdlib supports HTTP/2 by default when serving over TLS, but has to be explicitly enabled otherwise.
-		handler := h2c.NewHandler(h, &http2.Server{})
-		if err = http.Serve(ls, handler); err != nil && !errors.Is(err, net.ErrClosed) {
-			err = fmt.Errorf("Failed to serve HTTP: %w", err)
-		}
+		h2Handler := h2c.NewHandler(h, &http2.Server{})
+		errCh <- http.ListenAndServe(address, h2Handler)
 	}()
 
-	logr.Debug().Msg("HTTP server started")
-	logr.Info().Msg(fmt.Sprintf("Server is listening on http://%s and is ready to serve requests", ls.Addr()))
+	logr.Info().Msg(fmt.Sprintf("Server is listening on http://%s", address))
 
 	ctx := context.Background()
 	//Shut down HTTP server gracefully
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
 
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+		ctx, cancel = context.WithTimeout(ctx, time.Second*10)
+		defer cancel()
 
-	ctx, cancel = context.WithTimeout(ctx, cfg.ShutdownTimeout)
-	defer cancel()
+		if err = h.Shutdown(ctx); err != nil {
+			return fmt.Errorf("Failed to shutdown HTTP server: %w", err)
+		}
 
-	if err = h.Shutdown(ctx); err != nil {
-		return fmt.Errorf("Failed to shutdown HTTP server: %w", err)
+		logr.Debug().Msg("HTTP server shut down gracefully")
+	case err = <-errCh:
+		if err != nil && !errors.Is(err, net.ErrClosed) {
+			err = fmt.Errorf("Failed to start HTTP server: %w", err)
+		}
 	}
-
-	logr.Debug().Msg("HTTP server shut down gracefully")
-
 	return err
 }

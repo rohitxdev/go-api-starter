@@ -47,9 +47,7 @@ type Config struct {
 	// JWTSecret is the secret key used to sign JWT tokens.
 	JWTSecret string `json:"jwtSecret" validate:"required"`
 	// AllowedOrigins is a list of origins that are allowed to access the API.
-	AllowedOrigins []string `json:"allowedOrigins"`
-	// ShutdownTimeout is the duration after which the server will be shutdown forcefully.
-	ShutdownTimeout time.Duration `json:"shutdownTimeout" validate:"required"`
+	AllowedOrigins  []string      `json:"allowedOrigins"`
 	SessionDuration time.Duration `json:"sessionDuration" validate:"required"`
 	// LogInTokenExpiresIn is the duration after which the log-in token in email will expire.
 	LogInTokenExpiresIn time.Duration `json:"logInTokenExpiresIn" validate:"required"`
