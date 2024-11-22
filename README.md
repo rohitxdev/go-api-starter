@@ -1,6 +1,6 @@
 # Golang API starter
 
-<img src="./public/images/go-fast.png" alt="Gopher flash" height="128" width="128"/>
+<img src="./assets/public/images/go-fast.png" alt="Gopher flash" height="128" width="128"/>
 
 ## Development
 
