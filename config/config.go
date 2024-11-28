@@ -43,9 +43,9 @@ type Config struct {
 	GoogleClientID     string `json:"googleClientId"`
 	GoogleClientSecret string `json:"googleClientSecret"`
 	// AllowedOrigins is a list of origins that are allowed to access the API.
-	AllowedOrigins     []string `json:"allowedOrigins"`
 	AccessTokenSecret  string   `json:"accessTokenSecret" validate:"required"`
 	RefreshTokenSecret string   `json:"refreshTokenSecret" validate:"required"`
+	AllowedOrigins     []string `json:"allowedOrigins"`
 	// LogInTokenExpiresIn is the duration after which the log-in token in email will expire.
 	AccessTokenExpiresIn  time.Duration `json:"accessTokenExpiresIn" validate:"required"`
 	RefreshTokenExpiresIn time.Duration `json:"refreshTokenExpiresIn" validate:"required"`
