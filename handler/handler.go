@@ -38,31 +38,21 @@ type Services struct {
 	Repo      *repo.Repo
 }
 
-func (s *Services) Close() error {
-	if err := s.KVStore.Close(); err != nil {
-		return fmt.Errorf("Failed to close KV store: %w", err)
-	}
-	if err := s.Repo.Close(); err != nil {
-		return fmt.Errorf("Failed to close repo: %w", err)
-	}
-	return nil
-}
-
 // Custom view renderer
-type customRenderer struct {
+type renderer struct {
 	templates *template.Template
 }
 
-func (t customRenderer) Render(w io.Writer, name string, data any, c echo.Context) error {
+func (t renderer) Render(w io.Writer, name string, data any, c echo.Context) error {
 	return t.templates.ExecuteTemplate(w, name, data)
 }
 
 // Custom request validator
-type customValidator struct {
+type requestValidator struct {
 	validator *validator.Validate
 }
 
-func (v customValidator) Validate(i any) error {
+func (v requestValidator) Validate(i any) error {
 	if err := v.validator.Struct(i); err != nil {
 		return echo.NewHTTPError(http.StatusUnprocessableEntity, err)
 	}
@@ -70,9 +60,9 @@ func (v customValidator) Validate(i any) error {
 }
 
 // Custom JSON serializer & deserializer
-type customJSONSerializer struct{}
+type jsonSerializer struct{}
 
-func (s customJSONSerializer) Serialize(c echo.Context, data any, indent string) error {
+func (s jsonSerializer) Serialize(c echo.Context, data any, indent string) error {
 	enc := json.NewEncoder(c.Response())
 	if indent != "" {
 		enc.SetIndent("", indent)
@@ -80,7 +70,7 @@ func (s customJSONSerializer) Serialize(c echo.Context, data any, indent string)
 	return enc.Encode(data)
 }
 
-func (s customJSONSerializer) Deserialize(c echo.Context, v any) error {
+func (s jsonSerializer) Deserialize(c echo.Context, v any) error {
 	err := json.NewDecoder(c.Request().Body).Decode(v)
 	if ute, ok := err.(*json.UnmarshalTypeError); ok {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Unmarshal type error: expected=%v, got=%v, field=%v, offset=%v", ute.Type, ute.Value, ute.Field, ute.Offset)).SetInternal(err)
@@ -90,12 +80,42 @@ func (s customJSONSerializer) Deserialize(c echo.Context, v any) error {
 	return err
 }
 
-func New(svc *Services) (*echo.Echo, error) {
-	docs.SwaggerInfo.Host = net.JoinHostPort(svc.Config.Host, svc.Config.Port)
+func setUpRoutes(e *echo.Echo, h *Handler) {
+	e.GET("/metrics", echoprometheus.NewHandler())
+	e.GET("/swagger/*", echoSwagger.EchoWrapHandler())
+	e.GET("/config", h.getConfig)
+	e.GET("/me", h.getMe)
+	e.GET("/_", h.getAdmin)
+	e.GET("/", h.getHome)
+
+	auth := e.Group("/auth")
+	{
+		auth.POST("/sign-up", h.SignUp)
+		auth.POST("/log-in", h.LogIn)
+		auth.GET("/log-out", h.LogOut)
+		auth.GET("/access-token", h.GetAccessToken)
+	}
+
+	e.GET("/foo", func(c echo.Context) error {
+		user, err := h.checkAuth(c, RoleUser)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(user)
+
+		return c.NoContent(200)
+	})
+}
+
+func New(svc *Service) (*echo.Echo, error) {
+	h := Handler{Service: svc}
+
+	docs.SwaggerInfo.Host = net.JoinHostPort(h.Config.Host, h.Config.Port)
 
 	e := echo.New()
-	e.JSONSerializer = customJSONSerializer{}
-	e.Validator = customValidator{
+	e.JSONSerializer = jsonSerializer{}
+	e.Validator = requestValidator{
 		validator: validator.New(),
 	}
 	e.IPExtractor = echo.ExtractIPFromXFFHeader(
@@ -108,19 +128,19 @@ func New(svc *Services) (*echo.Echo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not parse templates: %w", err)
 	}
-	e.Renderer = customRenderer{
+	e.Renderer = renderer{
 		templates: pageTemplates,
 	}
 
 	//Pre-router middlewares
-	if !svc.Config.IsDev {
+	if !h.Config.IsDev {
 		e.Pre(middleware.CSRF())
 	}
 
 	e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins:                             svc.Config.AllowedOrigins,
+		AllowOrigins:                             h.Config.AllowedOrigins,
 		AllowCredentials:                         true,
-		UnsafeWildcardOriginWithAllowCredentials: svc.Config.IsDev,
+		UnsafeWildcardOriginWithAllowCredentials: h.Config.IsDev,
 	}))
 
 	e.Pre(middleware.Secure())
@@ -137,7 +157,7 @@ func New(svc *Services) (*echo.Echo, error) {
 		},
 	}))
 
-	e.Pre(session.Middleware(sessions.NewCookieStore([]byte(svc.Config.SessionSecret))))
+	e.Pre(session.Middleware(sessions.NewCookieStore([]byte(h.Config.SessionSecret))))
 
 	e.Pre(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
 		Generator: ulid.Make().String,
@@ -157,7 +177,7 @@ func New(svc *Services) (*echo.Echo, error) {
 		LogError:        true,
 		LogHost:         true,
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			log := svc.Logger.Info().
+			log := h.Logger.Info().
 				Ctx(c.Request().Context()).
 				Str("id", v.RequestID).
 				Str("remoteIp", v.RemoteIP).
@@ -177,7 +197,7 @@ func New(svc *Services) (*echo.Echo, error) {
 				log = log.Str("referer", v.Referer)
 			}
 			if user, ok := c.Get("user").(*repo.User); ok && (user != nil) {
-				log = log.Uint64("userId", user.Id)
+				log = log.Uint64("userId", user.ID)
 			}
 
 			log.Msg("HTTP request")
@@ -199,7 +219,7 @@ func New(svc *Services) (*echo.Echo, error) {
 
 	e.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
 		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
-			svc.Logger.Error().Ctx(c.Request().Context()).
+			h.Logger.Error().Ctx(c.Request().Context()).
 				Err(err).
 				Str("stack", string(stack)).
 				Str("method", c.Request().Method).
@@ -215,28 +235,6 @@ func New(svc *Services) (*echo.Echo, error) {
 
 	pprof.Register(e)
 
-	setUpRoutes(e, svc)
-
+	setUpRoutes(e, &h)
 	return e, nil
-}
-
-func setUpRoutes(e *echo.Echo, svc *Services) {
-	h := &Handler{svc}
-
-	e.GET("/metrics", echoprometheus.NewHandler())
-	e.GET("/swagger/*", echoSwagger.EchoWrapHandler())
-	e.GET("/config", h.getConfig)
-	e.GET("/me", h.getMe, h.require(PermReadMe))
-	e.GET("/_", h.getAdmin, h.require(PermReadAdmin))
-	e.GET("/", h.getHome)
-
-	auth := e.Group("/auth")
-	{
-		logIn := auth.Group("/log-in")
-		{
-			logIn.GET("", h.validateLogInToken)
-			logIn.POST("", h.sendLoginEmail)
-		}
-		auth.GET("/log-out", h.logOut)
-	}
 }

@@ -47,10 +47,11 @@ type Config struct {
 	// JWTSecret is the secret key used to sign JWT tokens.
 	JWTSecret string `json:"jwtSecret" validate:"required"`
 	// AllowedOrigins is a list of origins that are allowed to access the API.
-	AllowedOrigins  []string      `json:"allowedOrigins"`
-	SessionDuration time.Duration `json:"sessionDuration" validate:"required"`
+	AllowedOrigins []string `json:"allowedOrigins"`
 	// LogInTokenExpiresIn is the duration after which the log-in token in email will expire.
-	LogInTokenExpiresIn time.Duration `json:"logInTokenExpiresIn" validate:"required"`
+	LogInTokenExpiresIn   time.Duration `json:"logInTokenExpiresIn" validate:"required"`
+	AccessTokenExpiresIn  time.Duration `json:"accessTokenExpiresIn" validate:"required"`
+	RefreshTokenExpiresIn time.Duration `json:"refreshTokenExpiresIn" validate:"required"`
 	// SMTPPort is the port of the SMTP server.
 	SMTPPort int `json:"smtpPort" validate:"required"`
 	// IsDev is a flag indicating whether the server is running in development mode.
@@ -81,7 +82,10 @@ func Load() (*Config, error) {
 	if m["shutdownTimeout"], err = time.ParseDuration(m["shutdownTimeout"].(string)); err != nil {
 		errList = append(errList, fmt.Errorf("Failed to parse shutdown timeout: %w", err))
 	}
-	if m["sessionDuration"], err = time.ParseDuration(m["sessionDuration"].(string)); err != nil {
+	if m["accessTokenExpiresIn"], err = time.ParseDuration(m["accessTokenExpiresIn"].(string)); err != nil {
+		errList = append(errList, fmt.Errorf("Failed to parse session duration: %w", err))
+	}
+	if m["refreshTokenExpiresIn"], err = time.ParseDuration(m["refreshTokenExpiresIn"].(string)); err != nil {
 		errList = append(errList, fmt.Errorf("Failed to parse session duration: %w", err))
 	}
 	if m["logInTokenExpiresIn"], err = time.ParseDuration(m["logInTokenExpiresIn"].(string)); err != nil {

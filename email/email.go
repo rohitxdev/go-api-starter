@@ -3,6 +3,7 @@ package email
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,10 +15,11 @@ import (
 )
 
 type SMTPCredentials struct {
-	Username string
-	Password string
-	Host     string
-	Port     int
+	Username           string
+	Password           string
+	Host               string
+	Port               int
+	InsecureSkipVerify bool
 }
 
 // Client is an email client that handles sending emails through SMTP.
@@ -32,8 +34,12 @@ func New(c *SMTPCredentials) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse email templates: %w", err)
 	}
+
+	dialer := gomail.NewDialer(c.Host, c.Port, c.Username, c.Password)
+	dialer.TLSConfig = &tls.Config{InsecureSkipVerify: c.InsecureSkipVerify}
+
 	client := Client{
-		dialer:    gomail.NewDialer(c.Host, c.Port, c.Username, c.Password),
+		dialer:    dialer,
 		templates: t,
 	}
 	return &client, nil

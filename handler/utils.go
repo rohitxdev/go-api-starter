@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
+	"github.com/rohitxdev/go-api-starter/cryptoutil"
 	"github.com/rohitxdev/go-api-starter/repo"
 )
 
@@ -22,7 +22,7 @@ func bindAndValidate(c echo.Context, i any) error {
 		return err
 	}
 	if err = c.Validate(i); err != nil {
-		return echo.NewHTTPError(http.StatusUnprocessableEntity, err)
+		return echo.ErrUnprocessableEntity
 	}
 	return err
 }
@@ -43,27 +43,77 @@ type response struct {
 	Message string `json:"message,omitempty"`
 }
 
-func createSession(c echo.Context, duration time.Duration, userId uint64) (*sessions.Session, error) {
+func (h Handler) checkAuth(c echo.Context, r role) (*repo.User, error) {
 	sess, err := session.Get("session", c)
 	if err != nil {
 		return nil, err
 	}
-	sess.Options = &sessions.Options{
-		Path:     "/",
-		MaxAge:   int(duration.Seconds()),
-		HttpOnly: true,
+	userID, ok := sess.Values["userId"].(uint64)
+	if !ok {
+		return nil, echo.ErrUnauthorized
 	}
-	sess.Values["userId"] = userId
-	if err := sess.Save(c.Request(), c.Response()); err != nil {
-		return nil, err
+	user, err := h.Repo.GetUserById(c.Request().Context(), userID)
+	if err != nil {
+		return nil, echo.ErrUnauthorized
 	}
-	return sess, nil
+	if user.AccountStatus != "active" {
+		return nil, echo.ErrForbidden
+	}
+	if roles[role(user.Role)] < roles[role(r)] {
+		return nil, echo.ErrForbidden
+	}
+	return user, nil
 }
 
-func getUser(c echo.Context) *repo.User {
-	user, ok := c.Get("user").(*repo.User)
-	if !ok {
-		return nil
+func setAccessTokenCookie(c echo.Context, expiresIn time.Duration, userID uint64, secret string) error {
+	accessToken, err := cryptoutil.GenerateJWT(userID, expiresIn, secret)
+	if err != nil {
+		return err
 	}
-	return user
+	cookie := http.Cookie{
+		Name:     "accessToken",
+		Value:    accessToken,
+		MaxAge:   int(expiresIn.Seconds()),
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+	}
+	c.SetCookie(&cookie)
+	return nil
+}
+
+func setRefreshTokenCookie(c echo.Context, expiresIn time.Duration, userID uint64, secret string) error {
+	refreshToken, err := cryptoutil.GenerateJWT(userID, expiresIn, secret)
+	if err != nil {
+		return err
+	}
+	cookie := http.Cookie{
+		Name:     "refreshToken",
+		Value:    refreshToken,
+		MaxAge:   int(expiresIn.Seconds()),
+		Path:     "/auth/access-token",
+		HttpOnly: true,
+		Secure:   true,
+	}
+	c.SetCookie(&cookie)
+	return nil
+}
+
+func clearAuthCookies(c echo.Context) {
+	c.SetCookie(&http.Cookie{
+		Name:     "accessToken",
+		Value:    "",
+		MaxAge:   -1,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+	})
+	c.SetCookie(&http.Cookie{
+		Name:     "refreshToken",
+		Value:    "",
+		MaxAge:   -1,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+	})
 }

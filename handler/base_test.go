@@ -100,7 +100,7 @@ func TestRootRoutes(t *testing.T) {
 	e, err := email.New(&email.SMTPCredentials{})
 	assert.Nil(t, err)
 
-	h, err := handler.New(&handler.Services{
+	h, err := handler.New(&handler.Service{
 		BlobStore: bs,
 		Config:    cfg,
 		KVStore:   kv,

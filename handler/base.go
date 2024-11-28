@@ -1,13 +1,39 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/rohitxdev/go-api-starter/blobstore"
+	"github.com/rohitxdev/go-api-starter/config"
+	"github.com/rohitxdev/go-api-starter/email"
+	"github.com/rohitxdev/go-api-starter/kvstore"
+	"github.com/rohitxdev/go-api-starter/repo"
+	"github.com/rs/zerolog"
 )
 
+type Service struct {
+	BlobStore *blobstore.Store
+	Config    *config.Config
+	Email     *email.Client
+	KVStore   *kvstore.Store
+	Logger    *zerolog.Logger
+	Repo      *repo.Repo
+}
+
+func (s *Service) Close() error {
+	if err := s.KVStore.Close(); err != nil {
+		return fmt.Errorf("Failed to close KV store: %w", err)
+	}
+	if err := s.Repo.Close(); err != nil {
+		return fmt.Errorf("Failed to close repo: %w", err)
+	}
+	return nil
+}
+
 type Handler struct {
-	*Services
+	*Service
 }
 
 // @Summary Home Page
@@ -39,6 +65,10 @@ func (h *Handler) getConfig(c echo.Context) error {
 // @Success 200 {string} string "Admin page"
 // @Failure 401 {string} string "invalid session"
 func (h *Handler) getAdmin(c echo.Context) error {
+	_, err := h.checkAuth(c, RoleAdmin)
+	if err != nil {
+		return err
+	}
 	return c.JSON(http.StatusOK, response{Message: "You're an admin."})
 }
 
@@ -49,9 +79,9 @@ func (h *Handler) getAdmin(c echo.Context) error {
 // @Success 200 {object} repo.User
 // @Failure 401 {string} string "invalid session"
 func (h *Handler) getMe(c echo.Context) error {
-	user := getUser(c)
-	if user == nil {
-		return c.JSON(http.StatusUnauthorized, response{Message: "User is not logged in."})
+	user, err := h.checkAuth(c, RoleUser)
+	if err != nil {
+		return err
 	}
 	return c.JSON(http.StatusOK, user)
 }

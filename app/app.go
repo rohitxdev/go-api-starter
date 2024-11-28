@@ -80,7 +80,7 @@ func Run() error {
 		return fmt.Errorf("Failed to create email client: %w", err)
 	}
 
-	s := handler.Services{
+	s := handler.Service{
 		BlobStore: bs,
 		Config:    cfg,
 		Email:     e,
