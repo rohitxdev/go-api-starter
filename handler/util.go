@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/rohitxdev/go-api-starter/cryptoutil"
 	"github.com/rohitxdev/go-api-starter/repo"
@@ -43,13 +42,25 @@ type response struct {
 	Message string `json:"message,omitempty"`
 }
 
+type role string
+
+const (
+	RoleUser  role = repo.RoleUser
+	RoleAdmin role = repo.RoleAdmin
+)
+
+var roles = map[role]uint8{
+	RoleUser:  1,
+	RoleAdmin: 2,
+}
+
 func (h Handler) checkAuth(c echo.Context, r role) (*repo.User, error) {
-	sess, err := session.Get("session", c)
+	accessTokenCookie, err := c.Cookie("accessToken")
 	if err != nil {
-		return nil, err
+		return nil, echo.ErrUnauthorized
 	}
-	userID, ok := sess.Values["userId"].(uint64)
-	if !ok {
+	userID, err := cryptoutil.VerifyJWT(accessTokenCookie.Value, h.Config.AccessTokenSecret)
+	if err != nil {
 		return nil, echo.ErrUnauthorized
 	}
 	user, err := h.Repo.GetUserById(c.Request().Context(), userID)

@@ -42,16 +42,14 @@ type Config struct {
 	// GoogleClientID is the client ID for Google OAuth2 authentication.
 	GoogleClientID     string `json:"googleClientId"`
 	GoogleClientSecret string `json:"googleClientSecret"`
-	// SessionSecret is the secret key used to sign session cookies.
-	SessionSecret string `json:"sessionSecret" validate:"required"`
-	// JWTSecret is the secret key used to sign JWT tokens.
-	JWTSecret string `json:"jwtSecret" validate:"required"`
 	// AllowedOrigins is a list of origins that are allowed to access the API.
-	AllowedOrigins []string `json:"allowedOrigins"`
+	AllowedOrigins     []string `json:"allowedOrigins"`
+	AccessTokenSecret  string   `json:"accessTokenSecret" validate:"required"`
+	RefreshTokenSecret string   `json:"refreshTokenSecret" validate:"required"`
 	// LogInTokenExpiresIn is the duration after which the log-in token in email will expire.
-	LogInTokenExpiresIn   time.Duration `json:"logInTokenExpiresIn" validate:"required"`
 	AccessTokenExpiresIn  time.Duration `json:"accessTokenExpiresIn" validate:"required"`
 	RefreshTokenExpiresIn time.Duration `json:"refreshTokenExpiresIn" validate:"required"`
+	LogInTokenExpiresIn   time.Duration `json:"logInTokenExpiresIn" validate:"required"`
 	// SMTPPort is the port of the SMTP server.
 	SMTPPort int `json:"smtpPort" validate:"required"`
 	// IsDev is a flag indicating whether the server is running in development mode.

@@ -43,10 +43,10 @@ func (h *Handler) LogIn(c echo.Context) error {
 		return echo.ErrUnauthorized
 	}
 
-	if err = setAccessTokenCookie(c, h.Config.AccessTokenExpiresIn, user.ID, h.Config.JWTSecret); err != nil {
+	if err = setAccessTokenCookie(c, h.Config.AccessTokenExpiresIn, user.ID, h.Config.AccessTokenSecret); err != nil {
 		return fmt.Errorf("failed to set access token cookie: %w", err)
 	}
-	if err = setRefreshTokenCookie(c, h.Config.RefreshTokenExpiresIn, user.ID, h.Config.JWTSecret); err != nil {
+	if err = setRefreshTokenCookie(c, h.Config.RefreshTokenExpiresIn, user.ID, h.Config.RefreshTokenSecret); err != nil {
 		return fmt.Errorf("failed to set refresh token cookie: %w", err)
 	}
 	return c.JSON(http.StatusOK, response{Message: "Logged in successfully"})
@@ -84,10 +84,10 @@ func (h *Handler) SignUp(c echo.Context) error {
 		}
 	}
 
-	if err = setAccessTokenCookie(c, h.Config.AccessTokenExpiresIn, userID, h.Config.JWTSecret); err != nil {
+	if err = setAccessTokenCookie(c, h.Config.AccessTokenExpiresIn, userID, h.Config.AccessTokenSecret); err != nil {
 		return fmt.Errorf("failed to set access token cookie: %w", err)
 	}
-	if err = setRefreshTokenCookie(c, h.Config.RefreshTokenExpiresIn, userID, h.Config.JWTSecret); err != nil {
+	if err = setRefreshTokenCookie(c, h.Config.RefreshTokenExpiresIn, userID, h.Config.RefreshTokenSecret); err != nil {
 		return fmt.Errorf("failed to set refresh token cookie: %w", err)
 	}
 	return c.JSON(http.StatusCreated, response{Message: "Signed up successfully"})
@@ -104,7 +104,7 @@ func (h *Handler) GetAccessToken(c echo.Context) error {
 		}
 	}()
 
-	userID, err := cryptoutil.VerifyJWT(refreshToken.Value, h.Config.JWTSecret)
+	userID, err := cryptoutil.VerifyJWT(refreshToken.Value, h.Config.RefreshTokenSecret)
 	if err != nil {
 		return echo.ErrUnauthorized
 	}
@@ -117,7 +117,7 @@ func (h *Handler) GetAccessToken(c echo.Context) error {
 		return echo.ErrForbidden
 	}
 
-	if err = setAccessTokenCookie(c, h.Config.AccessTokenExpiresIn, user.ID, h.Config.JWTSecret); err != nil {
+	if err = setAccessTokenCookie(c, h.Config.AccessTokenExpiresIn, user.ID, h.Config.AccessTokenSecret); err != nil {
 		return fmt.Errorf("failed to set access token cookie: %w", err)
 	}
 	return c.JSON(http.StatusOK, response{Message: "Generated access token successfully"})

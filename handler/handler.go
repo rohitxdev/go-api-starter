@@ -11,10 +11,8 @@ import (
 
 	"github.com/go-playground/validator"
 	"github.com/goccy/go-json"
-	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo-contrib/pprof"
-	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/oklog/ulid/v2"
@@ -156,8 +154,6 @@ func New(svc *Service) (*echo.Echo, error) {
 			return strings.HasPrefix(c.Request().URL.Path, "/debug/pprof")
 		},
 	}))
-
-	e.Pre(session.Middleware(sessions.NewCookieStore([]byte(h.Config.SessionSecret))))
 
 	e.Pre(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
 		Generator: ulid.Make().String,
