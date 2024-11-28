@@ -147,7 +147,7 @@ benchmark() {
 pprof() {
     print loading "Generating pprof profile"
     [[ -z "$PORT" ]] && print error "PORT is not set" && return 1
-    curl "http://localhost:${PORT}/debug/pprof/profile?seconds=30" >default.pgo && print success "Pprof profile generated"
+    curl --insecure "https://localhost:${PORT}/debug/pprof/profile?seconds=30" >default.pgo && print success "Pprof profile generated"
 }
 
 checkpoint() {
