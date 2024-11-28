@@ -15,12 +15,6 @@ CONFIG_FILE=${CONFIG_FILE:-"config.json"}
 # Disable exporting of all variables
 set +o allexport
 
-prompt() {
-    read -p "$1 [y/n]: " -s -n 1 -r res
-    echo
-    [[ "$res" =~ ^[Yy]$ ]]
-}
-
 print() {
     declare -A colors=(["debug"]="30" ["loading"]="30" ["info"]="34" ["success"]="32" ["warn"]="33" ["error"]="31")
     local prefix
@@ -60,7 +54,7 @@ repo="$(echo "$PACKAGE_NAME" | cut -d '/' -f 2-)"
 readonly repo
 readonly tag="$APP_VERSION"
 readonly build_file_name="main"
-readonly build_file_path="./bin/$build_file_name"
+readonly build_file_path=".bin/$build_file_name"
 readonly image_name="$repo:$tag"
 
 docker_build() {
@@ -157,8 +151,8 @@ pprof() {
 }
 
 checkpoint() {
-    prompt "Create git checkpoint and push changes to origin?" || return 1
-    if ! build && ! prompt "Still continue?"; then
+    read -p "Create git checkpoint and push changes to origin?" -r
+    if ! build && ! read -p "Still continue?" -r; then
         print "Quitting"
         return 1
     fi

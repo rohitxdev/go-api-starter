@@ -1,6 +1,5 @@
-bin
+.bin
 .sqlite
-tmp
 .tmp
 *.env*
 .DS_Store
