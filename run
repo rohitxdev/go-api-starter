@@ -152,12 +152,10 @@ pprof() {
 
 checkpoint() {
     read -p "Create git checkpoint and push changes to origin?" -r
-    if ! build && ! read -p "Still continue?" -r; then
-        print "Quitting"
-        return 1
-    fi
+    ! build && ! read -p "Still continue?" -r
 
     read -p "Commit message (optional): " -r msg
+    echo
 
     git add --all
     if ! git commit -m "${msg:-Checkpoint - $(date -u)}" || ! git push; then
