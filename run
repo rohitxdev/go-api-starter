@@ -155,10 +155,9 @@ checkpoint() {
     ! build && ! read -p "Still continue?" -r
 
     read -p "Commit message (optional): " -r msg
-    echo
 
     git add --all
-    if ! git commit -m "${msg:-Checkpoint - $(date -u)}" || ! git push; then
+    if ! git commit -m "${msg:-"Checkpoint - $(date -u)"}" || ! git push; then
         print error "Failed to create checkpoint"
         return 1
     fi
