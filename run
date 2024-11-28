@@ -151,11 +151,8 @@ pprof() {
 }
 
 checkpoint() {
-    read -p "Create git checkpoint and push changes to origin?" -r
-    ! build && ! read -p "Still continue?" -r
-
+    read -p "Create git checkpoint and push changes to origin?" -r && ! build && ! read -p "Still continue?" -r
     read -p "Commit message (optional): " -r msg
-
     git add --all
     if ! git commit -m "${msg:-"Checkpoint - $(date -u)"}" || ! git push; then
         print error "Failed to create checkpoint"
