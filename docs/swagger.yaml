@@ -9,21 +9,19 @@ definitions:
         type: string
       email:
         type: string
-      fullName:
-        type: string
       gender:
         type: string
       id:
         type: integer
       imageUrl:
         type: string
-      isVerified:
-        type: boolean
-      phoneNumber:
+      passwordHash:
         type: string
       role:
         type: string
       updatedAt:
+        type: string
+      username:
         type: string
     type: object
 info:

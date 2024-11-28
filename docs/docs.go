@@ -111,9 +111,6 @@ const docTemplate = `{
                 "email": {
                     "type": "string"
                 },
-                "fullName": {
-                    "type": "string"
-                },
                 "gender": {
                     "type": "string"
                 },
@@ -123,16 +120,16 @@ const docTemplate = `{
                 "imageUrl": {
                     "type": "string"
                 },
-                "isVerified": {
-                    "type": "boolean"
-                },
-                "phoneNumber": {
+                "passwordHash": {
                     "type": "string"
                 },
                 "role": {
                     "type": "string"
                 },
                 "updatedAt": {
+                    "type": "string"
+                },
+                "username": {
                     "type": "string"
                 }
             }

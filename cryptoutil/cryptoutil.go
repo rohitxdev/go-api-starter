@@ -5,12 +5,19 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/subtle"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base32"
 	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"math/big"
+	"net"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -166,4 +173,111 @@ func VerifyJWT(tokenString string, secret string) (uint64, error) {
 		return uint64(claims["id"].(float64)), nil
 	}
 	return 0, fmt.Errorf("invalid token")
+}
+
+func checkCertValidity(filePath string) bool {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return false
+	}
+
+	block, _ := pem.Decode(data)
+	if block == nil || block.Type != "CERTIFICATE" {
+		return false
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return false
+	}
+
+	return time.Now().Before(cert.NotAfter)
+}
+
+func checkKeyValidity(filePath string) bool {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return false
+	}
+
+	block, _ := pem.Decode(data)
+	if block == nil || block.Type != "RSA PRIVATE KEY" {
+		return false
+	}
+
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return false
+	}
+
+	return privateKey != nil
+}
+
+func GenerateSelfSignedCert() (string, string, error) {
+	rootPath := os.TempDir()
+	certPath := filepath.Join(rootPath, "localhost.crt")
+	keyPath := filepath.Join(rootPath, "localhost.key")
+
+	if checkCertValidity(certPath) && checkKeyValidity(keyPath) {
+		return certPath, keyPath, nil
+	}
+
+	// Generate private key
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return "", "", err
+	}
+
+	// Certificate template
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			Organization: []string{"Development"},
+			CommonName:   "localhost",
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		DNSNames:              []string{"localhost"},
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+	}
+
+	// Create self-signed certificate
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		return "", "", err
+	}
+
+	// Write certificate to file
+	certFile, err := os.Create(certPath)
+	if err != nil {
+		return "", "", err
+	}
+	defer certFile.Close()
+
+	certBlock := pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: derBytes,
+	}
+	if err = pem.Encode(certFile, &certBlock); err != nil {
+		return "", "", nil
+	}
+
+	// Write private key to file
+	keyFile, err := os.Create(keyPath)
+	if err != nil {
+		return "", "", err
+	}
+	defer keyFile.Close()
+
+	keyBock := pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	}
+	if err = pem.Encode(keyFile, &keyBock); err != nil {
+		return "", "", nil
+	}
+	return certPath, keyPath, nil
 }

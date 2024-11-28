@@ -10,13 +10,13 @@ services:
     ports:
       - ${PORT}:${PORT}
     environment:
-      - SECRETS_FILE=/run/secrets/secrets.json
+      - CONFIG_FILE=/run/secrets/config.json
     secrets:
-      - secrets.json
+      - config.json
     deploy:
       resources:
         limits:
           cpus: '4'
 secrets:
-  secrets.json:
-    file: secrets.json
+  config.json:
+    file: config.json

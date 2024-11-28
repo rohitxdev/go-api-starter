@@ -53,30 +53,28 @@ type Config struct {
 	// SMTPPort is the port of the SMTP server.
 	SMTPPort int `json:"smtpPort" validate:"required"`
 	// IsDev is a flag indicating whether the server is running in development mode.
-	IsDev bool `json:"isDev"`
+	IsDev     bool `json:"isDev"`
+	UseDevTLS bool `json:"useDevTls"`
 }
 
 func Load() (*Config, error) {
 	var m map[string]any
 	var err error
 
-	if secretsFile := os.Getenv("SECRETS_FILE"); secretsFile != "" {
-		if m, err = loadFromFile(secretsFile); err != nil {
+	if configFile := os.Getenv("CONFIG_FILE"); configFile != "" {
+		if m, err = loadFromFile(configFile); err != nil {
 			return nil, fmt.Errorf("Failed to load secrets file: %w", err)
 		}
-	} else if secretsJSON := os.Getenv("SECRETS_JSON"); secretsJSON != "" {
-		if m, err = loadFromJSON(secretsJSON); err != nil {
+	} else if configJSON := os.Getenv("CONFIG_JSON"); configJSON != "" {
+		if m, err = loadFromJSON(configJSON); err != nil {
 			return nil, fmt.Errorf("Failed to load secrets JSON: %w", err)
 		}
 	} else {
-		return nil, errors.New("SECRETS_FILE or SECRETS_JSON must be set")
+		return nil, errors.New("CONFIG_FILE or CONFIG_JSON must be set")
 	}
 
 	var errList []error
 
-	m["env"] = os.Getenv("ENV")
-	m["host"] = os.Getenv("HOST")
-	m["port"] = os.Getenv("PORT")
 	if m["shutdownTimeout"], err = time.ParseDuration(m["shutdownTimeout"].(string)); err != nil {
 		errList = append(errList, fmt.Errorf("Failed to parse shutdown timeout: %w", err))
 	}
@@ -123,8 +121,8 @@ func Load() (*Config, error) {
 	return &cfg, err
 }
 
-func loadFromFile(secretsFile string) (map[string]any, error) {
-	data, err := os.ReadFile(secretsFile)
+func loadFromFile(configFile string) (map[string]any, error) {
+	data, err := os.ReadFile(configFile)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to read secrets file: %w", err)
 	}

@@ -5,15 +5,12 @@ set -e
 # Export all variables defined below
 set -o allexport
 
-ENV_FILE="${ENV_FILE:-".env"}"
-# shellcheck disable=SC1090
-[[ -r "$ENV_FILE" ]] && source "$ENV_FILE"
-
 PACKAGE_NAME=$(awk '/^module/ { print $2 }' go.mod)
 APP_NAME="$(basename "$PACKAGE_NAME")"
 APP_VERSION="$(git describe --tags --always --dirty)"
 GO_VERSION=$(awk '/^go/ { print $2 }' go.mod)
 BASE_IMAGE_TAG=":$GO_VERSION-alpine3.20"
+CONFIG_FILE=${CONFIG_FILE:-"config.json"}
 
 # Disable exporting of all variables
 set +o allexport
@@ -98,8 +95,8 @@ watch() {
 
     print loading "Starting development server"
     # build.kill_delay is in nanoseconds
-    air --tmp_dir="$tmp_dir" --build.cmd "$build_cmd" --build.bin "source $ENV_FILE; $tmp_dir/$build_file_name" --build.delay 0 --build.kill_delay 10000000000 \
-        --build.include_ext "go,tmpl,env" --build.send_interrupt true --log.main_only true
+    air --tmp_dir="$tmp_dir" --build.cmd "$build_cmd" --build.bin "$tmp_dir/$build_file_name" --build.delay 0 --build.kill_delay 10000000000 \
+        --build.include_ext "go,tmpl,json" --build.send_interrupt true --log.main_only true
 }
 
 build() {
@@ -114,7 +111,7 @@ build() {
     fi
 
     print loading "Building app"
-    if ! go generate ./... && eval "$build_cmd"; then
+    if ! go generate ./... || ! eval "$build_cmd"; then
         print error "Build failed"
         return 1
     fi
@@ -139,18 +136,18 @@ start() {
 
 test() {
     print loading "Running tests"
-    SECRETS_FILE=../../secrets.json go test --race --count=2 -v ./...
+    CONFIG_FILE=../../config.json go test --race --count=2 -v ./...
 }
 
 test_cover() {
     print loading "Running tests and generating coverage report"
     [[ -d .tmp ]] || mkdir .tmp
-    SECRETS_FILE=../../secrets.json go test --race --coverprofile=./.tmp/coverage.out ./... && go tool cover --html=./.tmp/coverage.out
+    CONFIG_FILE=../../config.json go test --race --coverprofile=./.tmp/coverage.out ./... && go tool cover --html=./.tmp/coverage.out
 }
 
 benchmark() {
     print loading "Running benchmarks"
-    SECRETS_FILE=../../secrets.json go test --race --count=2 -v --benchmem --bench=. ./...
+    CONFIG_FILE=../../config.json go test --race --count=2 -v --benchmem --bench=. ./...
 }
 
 pprof() {

@@ -100,9 +100,6 @@
                 "email": {
                     "type": "string"
                 },
-                "fullName": {
-                    "type": "string"
-                },
                 "gender": {
                     "type": "string"
                 },
@@ -112,16 +109,16 @@
                 "imageUrl": {
                     "type": "string"
                 },
-                "isVerified": {
-                    "type": "boolean"
-                },
-                "phoneNumber": {
+                "passwordHash": {
                     "type": "string"
                 },
                 "role": {
                     "type": "string"
                 },
                 "updatedAt": {
+                    "type": "string"
+                },
+                "username": {
                     "type": "string"
                 }
             }

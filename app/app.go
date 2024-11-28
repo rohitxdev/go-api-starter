@@ -13,6 +13,7 @@ import (
 
 	"github.com/rohitxdev/go-api-starter/blobstore"
 	"github.com/rohitxdev/go-api-starter/config"
+	"github.com/rohitxdev/go-api-starter/cryptoutil"
 	"github.com/rohitxdev/go-api-starter/database"
 	"github.com/rohitxdev/go-api-starter/email"
 	"github.com/rohitxdev/go-api-starter/handler"
@@ -97,14 +98,29 @@ func Run() error {
 
 	errCh := make(chan error)
 	address := net.JoinHostPort(cfg.Host, cfg.Port)
+	isDevTLS := cfg.IsDev && cfg.UseDevTLS
+
 	//Start HTTP server.
 	go func() {
-		// Stdlib supports HTTP/2 by default when serving over TLS, but has to be explicitly enabled otherwise.
-		h2Handler := h2c.NewHandler(h, &http2.Server{})
-		errCh <- http.ListenAndServe(address, h2Handler)
+		if isDevTLS {
+			// nolint
+			certPath, keyPath, err := cryptoutil.GenerateSelfSignedCert()
+			if err != nil {
+				errCh <- fmt.Errorf("failed to generate self-signed certificate: %w", err)
+			}
+			errCh <- http.ListenAndServeTLS(address, certPath, keyPath, h)
+		} else {
+			// Stdlib supports HTTP/2 by default when serving over TLS, but has to be explicitly enabled otherwise.
+			h2Handler := h2c.NewHandler(h, &http2.Server{})
+			errCh <- http.ListenAndServe(address, h2Handler)
+		}
 	}()
 
-	logr.Info().Msg(fmt.Sprintf("Server is listening on http://%s", address))
+	proto := "http"
+	if isDevTLS {
+		proto = "https"
+	}
+	logr.Info().Msg(fmt.Sprintf("Server is listening on %s://%s", proto, address))
 
 	ctx := context.Background()
 	//Shut down HTTP server gracefully.

@@ -4,4 +4,4 @@ tmp
 .tmp
 *.env*
 .DS_Store
-secrets.json
+config.json
