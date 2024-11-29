@@ -16,17 +16,17 @@ import (
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Success 200 {object} response
-// @Failure 401 {object} response
-// @Failure 500 {object} response
+// @Success 200 {object} Response
+// @Failure 401 {object} Response
+// @Failure 500 {object} Response
 // @Router /auth/logout [get]
 func (h *Handler) LogOut(c echo.Context) error {
 	_, err := c.Cookie("refreshToken")
 	if err != nil {
-		return echo.ErrUnauthorized
+		return c.JSON(http.StatusUnauthorized, Response{Message: "User is not logged in"})
 	}
 	clearAuthCookies(c)
-	return c.JSON(http.StatusOK, response{Message: "Logged out successfully"})
+	return c.JSON(http.StatusOK, Response{Message: "Logged out successfully", Success: true})
 }
 
 // @Summary Log in
@@ -36,10 +36,10 @@ func (h *Handler) LogOut(c echo.Context) error {
 // @Produce json
 // @Param email formData string true "Email"
 // @Param password formData string true "Password"
-// @Success 200 {object} response
-// @Failure 400 {object} response
-// @Failure 401 {object} response
-// @Failure 500 {object} response
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 401 {object} Response
+// @Failure 500 {object} Response
 // @Router /auth/log-in [post]
 func (h *Handler) LogIn(c echo.Context) error {
 	var req struct {
@@ -53,11 +53,11 @@ func (h *Handler) LogIn(c echo.Context) error {
 
 	user, err := h.Repo.GetUserByEmail(c.Request().Context(), req.Email)
 	if err != nil {
-		return echo.ErrNotFound
+		return c.JSON(http.StatusNotFound, Response{Message: "User not found"})
 	}
 
 	if !cryptoutil.VerifyPassword(req.Password, user.PasswordHash) {
-		return echo.ErrUnauthorized
+		return c.JSON(http.StatusUnauthorized, Response{Message: "Incorrect password"})
 	}
 
 	if err = setAccessTokenCookie(c, h.Config.AccessTokenExpiresIn, user.ID, h.Config.AccessTokenSecret); err != nil {
@@ -66,7 +66,7 @@ func (h *Handler) LogIn(c echo.Context) error {
 	if err = setRefreshTokenCookie(c, h.Config.RefreshTokenExpiresIn, user.ID, h.Config.RefreshTokenSecret); err != nil {
 		return fmt.Errorf("failed to set refresh token cookie: %w", err)
 	}
-	return c.JSON(http.StatusOK, response{Message: "Logged in successfully"})
+	return c.JSON(http.StatusOK, Response{Message: "Logged in successfully", Success: true})
 }
 
 // @Summary Sign up
@@ -76,9 +76,9 @@ func (h *Handler) LogIn(c echo.Context) error {
 // @Produce json
 // @Param email formData string true "Email"
 // @Param password formData string true "Password"
-// @Success 200 {object} response
-// @Failure 400 {object} response
-// @Failure 500 {object} response
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
 // @Router /auth/signup [post]
 func (h *Handler) SignUp(c echo.Context) error {
 	var req struct {
@@ -93,7 +93,7 @@ func (h *Handler) SignUp(c echo.Context) error {
 	var userID uint64
 	_, err := h.Repo.GetUserByEmail(c.Request().Context(), req.Email)
 	if err == nil {
-		return c.JSON(http.StatusBadRequest, response{Message: "User already exists"})
+		return c.JSON(http.StatusBadRequest, Response{Message: "User already exists"})
 	}
 
 	passwordHash, err := cryptoutil.HashPassword(req.Password)
@@ -104,7 +104,7 @@ func (h *Handler) SignUp(c echo.Context) error {
 	if userID, err = h.Repo.CreateUser(c.Request().Context(), req.Email, passwordHash); err != nil {
 		switch err {
 		case repo.ErrUserAlreadyExists:
-			return c.JSON(http.StatusBadRequest, response{Message: "User already exists"})
+			return c.JSON(http.StatusBadRequest, Response{Message: "User already exists"})
 		default:
 			return fmt.Errorf("failed to create user: %w", err)
 		}
@@ -116,7 +116,7 @@ func (h *Handler) SignUp(c echo.Context) error {
 	if err = setRefreshTokenCookie(c, h.Config.RefreshTokenExpiresIn, userID, h.Config.RefreshTokenSecret); err != nil {
 		return fmt.Errorf("failed to set refresh token cookie: %w", err)
 	}
-	return c.JSON(http.StatusCreated, response{Message: "Signed up successfully"})
+	return c.JSON(http.StatusCreated, Response{Message: "Signed up successfully", Success: true})
 }
 
 // @Summary Get access token
@@ -124,14 +124,14 @@ func (h *Handler) SignUp(c echo.Context) error {
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Success 200 {object} response
-// @Failure 401 {object} response
-// @Failure 500 {object} response
+// @Success 200 {object} Response
+// @Failure 401 {object} Response
+// @Failure 500 {object} Response
 // @Router /auth/access-token [get]
 func (h *Handler) GetAccessToken(c echo.Context) error {
 	refreshToken, err := c.Cookie("refreshToken")
 	if err != nil {
-		return echo.ErrUnauthorized
+		return c.JSON(http.StatusUnauthorized, Response{Message: "User is not logged in"})
 	}
 	defer func() {
 		if err != nil {
@@ -141,21 +141,21 @@ func (h *Handler) GetAccessToken(c echo.Context) error {
 
 	userID, err := cryptoutil.VerifyJWT(refreshToken.Value, h.Config.RefreshTokenSecret)
 	if err != nil {
-		return echo.ErrUnauthorized
+		return c.JSON(http.StatusUnauthorized, Response{Message: "Refresh token verification failed"})
 	}
 
 	user, err := h.Repo.GetUserById(c.Request().Context(), userID)
 	if err != nil {
-		return echo.ErrNotFound
+		return c.JSON(http.StatusNotFound, Response{Message: "User not found"})
 	}
 	if user.AccountStatus != repo.AccountStatusActive {
-		return echo.ErrForbidden
+		return c.JSON(http.StatusForbidden, Response{Message: "Account status is not ACTIVE"})
 	}
 
 	if err = setAccessTokenCookie(c, h.Config.AccessTokenExpiresIn, user.ID, h.Config.AccessTokenSecret); err != nil {
 		return fmt.Errorf("failed to set access token cookie: %w", err)
 	}
-	return c.JSON(http.StatusOK, response{Message: "Generated access token successfully"})
+	return c.JSON(http.StatusOK, Response{Message: "Generated access token successfully", Success: true})
 }
 
 // @Summary Change password
@@ -165,10 +165,10 @@ func (h *Handler) GetAccessToken(c echo.Context) error {
 // @Produce json
 // @Param currentPassword formData string true "Current password"
 // @Param newPassword formData string true "New password"
-// @Success 200 {object} response
-// @Failure 401 {object} response
-// @Failure 400 {object} response
-// @Failure 500 {object} response
+// @Success 200 {object} Response
+// @Failure 401 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
 // @Router /auth/change-password [post]
 func (h *Handler) ChangePassword(c echo.Context) error {
 	user, err := h.checkAuth(c, RoleUser)
@@ -184,12 +184,12 @@ func (h *Handler) ChangePassword(c echo.Context) error {
 	}
 
 	if !cryptoutil.VerifyPassword(req.CurrentPassword, user.PasswordHash) {
-		return c.JSON(http.StatusUnauthorized, response{Message: "Incorrect password"})
+		return c.JSON(http.StatusUnauthorized, Response{Message: "Incorrect password"})
 	}
 	if err := h.Repo.SetUserPassword(c.Request().Context(), user.ID, req.NewPassword); err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, response{Message: "Password updated successfully"})
+	return c.JSON(http.StatusOK, Response{Message: "Password updated successfully", Success: true})
 }
 
 // @Summary Send reset password email
@@ -198,10 +198,10 @@ func (h *Handler) ChangePassword(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param email formData string true "Email"
-// @Param callbackURL formData string true "Callback URL"
-// @Success 200 {object} response
-// @Failure 400 {object} response
-// @Failure 500 {object} response
+// @Param callbackUrl formData string true "Callback URL"
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
 // @Router /auth/reset-password [post]
 func (h *Handler) SendResetPasswordEmail(c echo.Context) error {
 	var req struct {
@@ -214,7 +214,7 @@ func (h *Handler) SendResetPasswordEmail(c echo.Context) error {
 
 	user, err := h.Repo.GetUserByEmail(c.Request().Context(), sanitizeEmail(req.Email))
 	if err != nil {
-		return echo.ErrNotFound
+		return c.JSON(http.StatusNotFound, Response{Message: "User not found"})
 	}
 	resetToken, err := cryptoutil.GenerateJWT(user.ID, h.Config.CommonTokenExpiresIn, h.Config.CommonTokenSecret)
 	if err != nil {
@@ -242,7 +242,7 @@ func (h *Handler) SendResetPasswordEmail(c echo.Context) error {
 	if err = h.Email.SendHTML(&emailOpts, "reset-password", data); err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, response{Message: "Sent password reset email successfully"})
+	return c.JSON(http.StatusOK, Response{Message: "Sent password reset email successfully", Success: true})
 }
 
 // @Summary Reset password
@@ -252,9 +252,9 @@ func (h *Handler) SendResetPasswordEmail(c echo.Context) error {
 // @Produce json
 // @Param token formData string true "Token"
 // @Param newPassword formData string true "New password"
-// @Success 200 {object} response
-// @Failure 400 {object} response
-// @Failure 500 {object} response
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
 // @Router /auth/reset-password [get]
 func (h *Handler) ResetPassword(c echo.Context) error {
 	var req struct {
@@ -267,10 +267,10 @@ func (h *Handler) ResetPassword(c echo.Context) error {
 
 	userID, err := cryptoutil.VerifyJWT(req.Token, h.Config.CommonTokenSecret)
 	if err != nil {
-		return echo.ErrUnauthorized
+		return c.JSON(http.StatusUnauthorized, Response{Message: "JWT verification failed"})
 	}
 	if _, err = h.Repo.GetUserById(c.Request().Context(), userID); err != nil {
-		return echo.ErrNotFound
+		return c.JSON(http.StatusNotFound, Response{Message: "User not found"})
 	}
 	passwordHash, err := cryptoutil.HashPassword(req.NewPassword)
 	if err != nil {
@@ -279,7 +279,7 @@ func (h *Handler) ResetPassword(c echo.Context) error {
 	if err = h.Repo.SetUserPassword(c.Request().Context(), userID, passwordHash); err != nil {
 		return err
 	}
-	return c.Render(http.StatusOK, "reset-password-success", nil)
+	return c.JSON(http.StatusOK, Response{Message: "Password updated successfully", Success: true})
 }
 
 // @Summary Send account verification email
@@ -288,9 +288,10 @@ func (h *Handler) ResetPassword(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param email formData string true "Email"
-// @Success 200 {object} response
-// @Failure 400 {object} response
-// @Failure 500 {object} response
+// @Param callbackUrl formData string true "Callback URL"
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
 // @Router /auth/verify-account [post]
 func (h *Handler) SendAccountVerificationEmail(c echo.Context) error {
 	var req struct {
@@ -303,10 +304,10 @@ func (h *Handler) SendAccountVerificationEmail(c echo.Context) error {
 
 	user, err := h.Repo.GetUserByEmail(c.Request().Context(), sanitizeEmail(req.Email))
 	if err != nil {
-		return echo.ErrNotFound
+		return c.JSON(http.StatusNotFound, Response{Message: "User not found"})
 	}
 	if user.AccountStatus != repo.AccountStatusPending {
-		return c.JSON(http.StatusBadRequest, response{Message: "Account status is not PENDING"})
+		return c.JSON(http.StatusBadRequest, Response{Message: "Account status is not PENDING"})
 	}
 	verificationToken, err := cryptoutil.GenerateJWT(user.ID, h.Config.CommonTokenExpiresIn, h.Config.CommonTokenSecret)
 	if err != nil {
@@ -334,7 +335,7 @@ func (h *Handler) SendAccountVerificationEmail(c echo.Context) error {
 	if err = h.Email.SendHTML(&emailOpts, "verify-account", data); err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, response{Message: "Sent email verification email successfully"})
+	return c.JSON(http.StatusOK, Response{Message: "Sent verification email successfully", Success: true})
 }
 
 // @Summary Verify account
@@ -343,9 +344,9 @@ func (h *Handler) SendAccountVerificationEmail(c echo.Context) error {
 // @Accept json
 // @Produce json
 // @Param token formData string true "Token"
-// @Success 200 {object} response
-// @Failure 400 {object} response
-// @Failure 500 {object} response
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
 // @Router /auth/verify-account [get]
 func (h *Handler) VerifyAccount(c echo.Context) error {
 	var req struct {
@@ -357,17 +358,17 @@ func (h *Handler) VerifyAccount(c echo.Context) error {
 
 	userID, err := cryptoutil.VerifyJWT(req.Token, h.Config.CommonTokenSecret)
 	if err != nil {
-		return echo.ErrUnauthorized
+		return c.JSON(http.StatusUnauthorized, Response{Message: "JWT verification failed"})
 	}
 	user, err := h.Repo.GetUserById(c.Request().Context(), userID)
 	if err != nil {
-		return echo.ErrUnauthorized
+		return c.JSON(http.StatusUnauthorized, Response{Message: "User not found"})
 	}
 	if user.AccountStatus != repo.AccountStatusPending {
-		return c.JSON(http.StatusBadRequest, response{Message: "Account status is not PENDING"})
+		return c.JSON(http.StatusBadRequest, Response{Message: "Account status is not PENDING"})
 	}
 	if err = h.Repo.SetAccountStatusActive(c.Request().Context(), user.ID); err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, response{Message: "Account verified successfully"})
+	return c.JSON(http.StatusOK, Response{Message: "Account verified successfully", Success: true})
 }

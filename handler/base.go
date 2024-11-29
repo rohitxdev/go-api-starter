@@ -44,18 +44,26 @@ func (h *Handler) GetHome(c echo.Context) error {
 	return c.Render(http.StatusOK, "home", nil)
 }
 
+type ClientConfig struct {
+	Env        string `json:"env"`
+	AppName    string `json:"appName"`
+	AppVersion string `json:"appVersion"`
+}
+
 // @Summary Get config
 // @Description Get client config.
 // @Router /config [get]
-// @Success 200 {object} map[string]any
+// @Success 200 {object} ResponseWithPayload[ClientConfig]
 func (h *Handler) GetConfig(c echo.Context) error {
-	cfg := h.Config
-	clientConfig := map[string]any{
-		"env":        cfg.Env,
-		"appName":    cfg.AppName,
-		"appVersion": cfg.AppVersion,
-	}
-	return c.JSON(http.StatusOK, clientConfig)
+	return c.JSON(http.StatusOK, ResponseWithPayload[ClientConfig]{
+		Message: "Fetched config successfully",
+		Success: true,
+		Payload: ClientConfig{
+			Env:        h.Config.Env,
+			AppName:    h.Config.AppName,
+			AppVersion: h.Config.AppVersion,
+		},
+	})
 }
 
 // @Summary Admin page
@@ -69,19 +77,36 @@ func (h *Handler) GetAdmin(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, response{Message: "You're an admin."})
+	return c.JSON(http.StatusOK, Response{
+		Message: "You have admin privileges",
+		Success: true,
+	})
 }
 
 // @Summary Get user
 // @Description Get user.
 // @Security ApiKeyAuth
 // @Router /me [get]
-// @Success 200 {object} repo.User
+// @Success 200 {object} ResponseWithPayload[repo.PublicUser]
 // @Failure 401 {string} string "invalid session"
 func (h *Handler) GetMe(c echo.Context) error {
 	user, err := h.checkAuth(c, RoleUser)
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, user)
+	return c.JSON(http.StatusOK, ResponseWithPayload[repo.PublicUser]{
+		Message: "Fetched current user successfully",
+		Success: true,
+		Payload: repo.PublicUser{
+			ID:          user.ID,
+			Role:        user.Role,
+			Email:       user.Email,
+			Username:    user.Username,
+			ImageURL:    user.ImageURL,
+			Gender:      user.Gender,
+			DateOfBirth: user.DateOfBirth,
+			CreatedAt:   user.CreatedAt,
+			UpdatedAt:   user.UpdatedAt,
+		},
+	})
 }

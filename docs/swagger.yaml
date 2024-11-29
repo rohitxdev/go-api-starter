@@ -1,13 +1,40 @@
 definitions:
-  handler.response:
+  handler.ClientConfig:
+    properties:
+      appName:
+        type: string
+      appVersion:
+        type: string
+      env:
+        type: string
+    type: object
+  handler.Response:
     properties:
       message:
         type: string
+      success:
+        type: boolean
     type: object
-  repo.User:
+  handler.ResponseWithPayload-handler_ClientConfig:
     properties:
-      accountStatus:
+      message:
         type: string
+      payload:
+        $ref: '#/definitions/handler.ClientConfig'
+      success:
+        type: boolean
+    type: object
+  handler.ResponseWithPayload-repo_PublicUser:
+    properties:
+      message:
+        type: string
+      payload:
+        $ref: '#/definitions/repo.PublicUser'
+      success:
+        type: boolean
+    type: object
+  repo.PublicUser:
+    properties:
       createdAt:
         type: string
       dateOfBirth:
@@ -19,8 +46,6 @@ definitions:
       id:
         type: integer
       imageUrl:
-        type: string
-      passwordHash:
         type: string
       role:
         type: string
@@ -43,7 +68,7 @@ paths:
       summary: Home Page
   /_:
     get:
-      description: Admin route.
+      description: Admin page.
       responses:
         "200":
           description: Admin page
@@ -55,7 +80,7 @@ paths:
             type: string
       security:
       - ApiKeyAuth: []
-      summary: Admin route
+      summary: Admin page
   /auth/access-token:
     get:
       consumes:
@@ -67,15 +92,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
       summary: Get access token
       tags:
       - Auth
@@ -101,19 +126,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
       summary: Change password
       tags:
       - Auth
@@ -139,19 +164,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
       summary: Log in
       tags:
       - Auth
@@ -166,15 +191,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
       summary: Log out
       tags:
       - Auth
@@ -200,15 +225,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
       summary: Reset password
       tags:
       - Auth
@@ -233,15 +258,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
       summary: Send reset password email
       tags:
       - Auth
@@ -267,15 +292,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
       summary: Sign up
       tags:
       - Auth
@@ -296,15 +321,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
       summary: Verify account
       tags:
       - Auth
@@ -324,15 +349,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handler.response'
+            $ref: '#/definitions/handler.Response'
       summary: Send account verification email
       tags:
       - Auth
@@ -343,8 +368,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/handler.ResponseWithPayload-handler_ClientConfig'
       summary: Get config
   /me:
     get:
@@ -353,7 +377,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/repo.User'
+            $ref: '#/definitions/handler.ResponseWithPayload-repo_PublicUser'
         "401":
           description: invalid session
           schema:

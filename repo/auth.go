@@ -32,18 +32,22 @@ const (
 	AccountStatusDeleted   = "DELETED"
 )
 
+type PublicUser struct {
+	Username    *string `json:"username,omitempty"`
+	ImageURL    *string `json:"imageUrl,omitempty"`
+	Gender      *string `json:"gender,omitempty"`
+	Role        string  `json:"role"`
+	Email       string  `json:"email"`
+	DateOfBirth *string `json:"dateOfBirth"`
+	CreatedAt   string  `json:"createdAt"`
+	UpdatedAt   string  `json:"updatedAt"`
+	ID          uint64  `json:"id"`
+}
+
 type User struct {
-	Email         string  `json:"email"`
-	PasswordHash  string  `json:"passwordHash"`
-	Role          string  `json:"role"`
-	AccountStatus string  `json:"accountStatus"`
-	Username      *string `json:"username,omitempty"`
-	ImageURL      *string `json:"imageUrl"`
-	Gender        *string `json:"gender,omitempty"`
-	DateOfBirth   *string `json:"dateOfBirth"`
-	CreatedAt     string  `json:"createdAt"`
-	UpdatedAt     string  `json:"updatedAt"`
-	ID            uint64  `json:"id"`
+	PasswordHash  string `json:"passwordHash,omitempty"`
+	AccountStatus string `json:"accountStatus"`
+	PublicUser
 }
 
 func (repo *Repo) GetUserById(ctx context.Context, userID uint64) (*User, error) {

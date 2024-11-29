@@ -124,6 +124,21 @@ func New(svc *Service) (*echo.Echo, error) {
 		templates: pageTemplates,
 	}
 
+	e.HTTPErrorHandler = func(err error, c echo.Context) {
+		var res Response
+		if httpErr, ok := err.(*echo.HTTPError); ok {
+			if msg, ok := httpErr.Message.(string); ok {
+				res.Message = msg
+			} else {
+				res.Message = httpErr.Error()
+			}
+			if err = c.JSON(httpErr.Code, res); err == nil {
+				return
+			}
+		}
+		e.DefaultHTTPErrorHandler(err, c)
+	}
+
 	//Pre-router middlewares
 	if !h.Config.IsDev {
 		e.Pre(middleware.CSRF())
@@ -177,8 +192,7 @@ func New(svc *Service) (*echo.Echo, error) {
 				Int64("durationMs", v.Latency.Milliseconds()).
 				Int64("bytesOut", v.ResponseSize).
 				Int("status", v.Status).
-				Str("host", v.Host).
-				Err(v.Error)
+				Str("host", v.Host)
 
 			if v.UserAgent != "" {
 				log = log.Str("ua", v.UserAgent)
@@ -188,6 +202,14 @@ func New(svc *Service) (*echo.Echo, error) {
 			}
 			if user, ok := c.Get("user").(*repo.User); ok && (user != nil) {
 				log = log.Uint64("userId", user.ID)
+			}
+
+			if err, ok := v.Error.(*echo.HTTPError); ok {
+				if err.Code == http.StatusInternalServerError {
+					log = log.Err(err)
+				}
+			} else {
+				log = log.Err(v.Error)
 			}
 
 			log.Msg("HTTP request")
@@ -216,7 +238,7 @@ func New(svc *Service) (*echo.Echo, error) {
 				Str("path", c.Path()).
 				Str("ip", c.RealIP()).
 				Str("id", c.Response().Header().Get(echo.HeaderXRequestID)).
-				Msg("HTTP handler panicked")
+				Msg("HTTP handler panic")
 			return nil
 		}},
 	))

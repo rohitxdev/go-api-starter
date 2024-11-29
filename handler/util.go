@@ -10,6 +10,17 @@ import (
 	"github.com/rohitxdev/go-api-starter/repo"
 )
 
+type Response struct {
+	Message string `json:"message,omitempty"`
+	Success bool   `json:"success"`
+}
+
+type ResponseWithPayload[T any] struct {
+	Payload T      `json:"payload,omitempty"`
+	Message string `json:"message,omitempty"`
+	Success bool   `json:"success"`
+}
+
 // bindAndValidate binds path params, query params and the request body into provided type `i` and validates provided `i`. `i` must be a pointer. The default binder binds body based on Content-Type header. Validator must be registered using `Echo#Validator`.
 func bindAndValidate(c echo.Context, i any) error {
 	var err error
@@ -21,7 +32,7 @@ func bindAndValidate(c echo.Context, i any) error {
 		return err
 	}
 	if err = c.Validate(i); err != nil {
-		return echo.ErrUnprocessableEntity
+		return err
 	}
 	return err
 }
@@ -36,10 +47,6 @@ func sanitizeEmail(email string) string {
 	username = strings.ReplaceAll(username, "-", "")
 	username = strings.ReplaceAll(username, ".", "")
 	return username + "@" + domain
-}
-
-type response struct {
-	Message string `json:"message,omitempty"`
 }
 
 type role string
