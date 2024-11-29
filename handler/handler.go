@@ -42,7 +42,7 @@ type renderer struct {
 }
 
 func (t renderer) Render(w io.Writer, name string, data any, c echo.Context) error {
-	return t.templates.ExecuteTemplate(w, name, data)
+	return t.templates.ExecuteTemplate(w, name+".tmpl", data)
 }
 
 // Custom request validator
@@ -81,10 +81,10 @@ func (s jsonSerializer) Deserialize(c echo.Context, v any) error {
 func setUpRoutes(e *echo.Echo, h *Handler) {
 	e.GET("/metrics", echoprometheus.NewHandler())
 	e.GET("/swagger/*", echoSwagger.EchoWrapHandler())
-	e.GET("/config", h.getConfig)
-	e.GET("/me", h.getMe)
-	e.GET("/_", h.getAdmin)
-	e.GET("/", h.getHome)
+	e.GET("/config", h.GetConfig)
+	e.GET("/me", h.GetMe)
+	e.GET("/_", h.GetAdmin)
+	e.GET("/", h.GetHome)
 
 	auth := e.Group("/auth")
 	{
@@ -92,18 +92,12 @@ func setUpRoutes(e *echo.Echo, h *Handler) {
 		auth.POST("/log-in", h.LogIn)
 		auth.GET("/log-out", h.LogOut)
 		auth.GET("/access-token", h.GetAccessToken)
+		auth.PUT("/change-password", h.ChangePassword)
+		auth.POST("/reset-password", h.SendResetPasswordEmail)
+		auth.GET("/reset-password", h.ResetPassword)
+		auth.POST("/verify-account", h.SendAccountVerificationEmail)
+		auth.GET("/verify-account", h.VerifyAccount)
 	}
-
-	e.GET("/foo", func(c echo.Context) error {
-		user, err := h.checkAuth(c, RoleUser)
-		if err != nil {
-			return err
-		}
-
-		fmt.Println(user)
-
-		return c.NoContent(200)
-	})
 }
 
 func New(svc *Service) (*echo.Echo, error) {

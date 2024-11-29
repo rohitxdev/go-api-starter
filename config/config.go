@@ -43,13 +43,13 @@ type Config struct {
 	GoogleClientID     string `json:"googleClientId"`
 	GoogleClientSecret string `json:"googleClientSecret"`
 	// AllowedOrigins is a list of origins that are allowed to access the API.
-	AccessTokenSecret  string   `json:"accessTokenSecret" validate:"required"`
-	RefreshTokenSecret string   `json:"refreshTokenSecret" validate:"required"`
-	AllowedOrigins     []string `json:"allowedOrigins"`
-	// LogInTokenExpiresIn is the duration after which the log-in token in email will expire.
+	AccessTokenSecret     string        `json:"accessTokenSecret" validate:"required"`
+	RefreshTokenSecret    string        `json:"refreshTokenSecret" validate:"required"`
+	CommonTokenSecret     string        `json:"commonTokenSecret" validate:"required"`
+	AllowedOrigins        []string      `json:"allowedOrigins"`
 	AccessTokenExpiresIn  time.Duration `json:"accessTokenExpiresIn" validate:"required"`
 	RefreshTokenExpiresIn time.Duration `json:"refreshTokenExpiresIn" validate:"required"`
-	LogInTokenExpiresIn   time.Duration `json:"logInTokenExpiresIn" validate:"required"`
+	CommonTokenExpiresIn  time.Duration `json:"commonTokenExpiresIn" validate:"required"`
 	// SMTPPort is the port of the SMTP server.
 	SMTPPort int `json:"smtpPort" validate:"required"`
 	// IsDev is a flag indicating whether the server is running in development mode.
@@ -84,7 +84,7 @@ func Load() (*Config, error) {
 	if m["refreshTokenExpiresIn"], err = time.ParseDuration(m["refreshTokenExpiresIn"].(string)); err != nil {
 		errList = append(errList, fmt.Errorf("Failed to parse session duration: %w", err))
 	}
-	if m["logInTokenExpiresIn"], err = time.ParseDuration(m["logInTokenExpiresIn"].(string)); err != nil {
+	if m["commonTokenExpiresIn"], err = time.ParseDuration(m["commonTokenExpiresIn"].(string)); err != nil {
 		errList = append(errList, fmt.Errorf("Failed to parse log in token expires in: %w", err))
 	}
 

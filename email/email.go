@@ -113,7 +113,7 @@ func (c *Client) send(opts *BaseOpts, mimeType string, body string, attachments 
 // SendHtml sends an HTML email using a template.
 func (c *Client) SendHTML(opts *BaseOpts, templateName string, data map[string]any, attachments ...Attachment) error {
 	var buf bytes.Buffer
-	if err := c.templates.ExecuteTemplate(&buf, templateName, data); err != nil {
+	if err := c.templates.ExecuteTemplate(&buf, templateName+".tmpl", data); err != nil {
 		// '%q' prints the template name in quotes
 		return fmt.Errorf("Failed to execute template %q: %w", templateName, err)
 	}

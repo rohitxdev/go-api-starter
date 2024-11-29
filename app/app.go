@@ -72,10 +72,11 @@ func Run() error {
 	}
 
 	e, err := email.New(&email.SMTPCredentials{
-		Host:     cfg.SMTPHost,
-		Port:     cfg.SMTPPort,
-		Username: cfg.SMTPUsername,
-		Password: cfg.SMTPPassword,
+		Host:               cfg.SMTPHost,
+		Port:               cfg.SMTPPort,
+		Username:           cfg.SMTPUsername,
+		Password:           cfg.SMTPPassword,
+		InsecureSkipVerify: true,
 	})
 	if err != nil {
 		return fmt.Errorf("Failed to create email client: %w", err)

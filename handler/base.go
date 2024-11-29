@@ -40,15 +40,15 @@ type Handler struct {
 // @Description Home page.
 // @Router / [get]
 // @Success 200 {html} string "home page"
-func (h *Handler) getHome(c echo.Context) error {
-	return c.Render(http.StatusOK, "home.tmpl", nil)
+func (h *Handler) GetHome(c echo.Context) error {
+	return c.Render(http.StatusOK, "home", nil)
 }
 
 // @Summary Get config
 // @Description Get client config.
 // @Router /config [get]
 // @Success 200 {object} map[string]any
-func (h *Handler) getConfig(c echo.Context) error {
+func (h *Handler) GetConfig(c echo.Context) error {
 	cfg := h.Config
 	clientConfig := map[string]any{
 		"env":        cfg.Env,
@@ -58,13 +58,13 @@ func (h *Handler) getConfig(c echo.Context) error {
 	return c.JSON(http.StatusOK, clientConfig)
 }
 
-// @Summary Admin route
-// @Description Admin route.
+// @Summary Admin page
+// @Description Admin page.
 // @Security ApiKeyAuth
 // @Router /_ [get]
 // @Success 200 {string} string "Admin page"
 // @Failure 401 {string} string "invalid session"
-func (h *Handler) getAdmin(c echo.Context) error {
+func (h *Handler) GetAdmin(c echo.Context) error {
 	_, err := h.checkAuth(c, RoleAdmin)
 	if err != nil {
 		return err
@@ -78,7 +78,7 @@ func (h *Handler) getAdmin(c echo.Context) error {
 // @Router /me [get]
 // @Success 200 {object} repo.User
 // @Failure 401 {string} string "invalid session"
-func (h *Handler) getMe(c echo.Context) error {
+func (h *Handler) GetMe(c echo.Context) error {
 	user, err := h.checkAuth(c, RoleUser)
 	if err != nil {
 		return err

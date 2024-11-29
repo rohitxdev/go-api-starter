@@ -90,7 +90,7 @@ func (repo *Repo) GetUserByEmail(ctx context.Context, email string) (*User, erro
 
 func (repo *Repo) CreateUser(ctx context.Context, email string, passwordHash string) (uint64, error) {
 	var userID uint64
-	err := repo.db.QueryRowContext(ctx, `INSERT INTO auth.users (role, email, password_hash, account_status) VALUES($1, $2, $3, $4) RETURNING id;`, RoleUser, email, passwordHash, AccountStatusActive).Scan(&userID)
+	err := repo.db.QueryRowContext(ctx, `INSERT INTO auth.users (role, email, password_hash, account_status) VALUES($1, $2, $3, $4) RETURNING id;`, RoleUser, email, passwordHash, AccountStatusPending).Scan(&userID)
 	if err != nil {
 		return 0, err
 	}
@@ -99,5 +99,10 @@ func (repo *Repo) CreateUser(ctx context.Context, email string, passwordHash str
 
 func (r *Repo) SetAccountStatusActive(ctx context.Context, id uint64) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE auth.users SET account_status=$1 WHERE id=$2;`, AccountStatusActive, id)
+	return err
+}
+
+func (r *Repo) SetUserPassword(ctx context.Context, id uint64, passwordHash string) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE auth.users SET password_hash=$1 WHERE id=$2;`, passwordHash, id)
 	return err
 }

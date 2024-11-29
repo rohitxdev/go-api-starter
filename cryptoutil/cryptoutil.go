@@ -14,6 +14,7 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
+	"log/slog"
 	"math/big"
 	"net"
 	"os"
@@ -159,6 +160,7 @@ func GenerateJWT(userID uint64, expiresIn time.Duration, secret string) (string,
 	return tokenString, nil
 }
 
+// 'VerifyJWT' returns the user ID and error.
 func VerifyJWT(tokenString string, secret string) (uint64, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -279,5 +281,8 @@ func GenerateSelfSignedCert() (string, string, error) {
 	if err = pem.Encode(keyFile, &keyBock); err != nil {
 		return "", "", nil
 	}
+
+	slog.Info("Generated self-signed TLS certificate and key")
+
 	return certPath, keyPath, nil
 }
