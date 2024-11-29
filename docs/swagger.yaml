@@ -249,7 +249,7 @@ paths:
         type: string
       - description: Callback URL
         in: formData
-        name: callbackURL
+        name: callbackUrl
         required: true
         type: string
       produces:
@@ -341,6 +341,11 @@ paths:
       - description: Email
         in: formData
         name: email
+        required: true
+        type: string
+      - description: Callback URL
+        in: formData
+        name: callbackUrl
         required: true
         type: string
       produces:

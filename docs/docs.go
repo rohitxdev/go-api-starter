@@ -311,7 +311,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Callback URL",
-                        "name": "callbackURL",
+                        "name": "callbackUrl",
                         "in": "formData",
                         "required": true
                     }
@@ -449,6 +449,13 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Email",
                         "name": "email",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Callback URL",
+                        "name": "callbackUrl",
                         "in": "formData",
                         "required": true
                     }
