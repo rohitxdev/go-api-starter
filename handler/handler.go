@@ -10,31 +10,17 @@ import (
 	"time"
 
 	"github.com/go-playground/validator"
-	"github.com/goccy/go-json"
+	gojson "github.com/goccy/go-json"
 	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo-contrib/pprof"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/oklog/ulid/v2"
 	"github.com/rohitxdev/go-api-starter/assets"
-	"github.com/rohitxdev/go-api-starter/blobstore"
-	"github.com/rohitxdev/go-api-starter/config"
 	"github.com/rohitxdev/go-api-starter/docs"
-	"github.com/rohitxdev/go-api-starter/email"
-	"github.com/rohitxdev/go-api-starter/kvstore"
 	"github.com/rohitxdev/go-api-starter/repo"
-	"github.com/rs/zerolog"
 	echoSwagger "github.com/swaggo/echo-swagger"
 )
-
-type Services struct {
-	BlobStore *blobstore.Store
-	Config    *config.Config
-	Email     *email.Client
-	KVStore   *kvstore.Store
-	Logger    *zerolog.Logger
-	Repo      *repo.Repo
-}
 
 // Custom view renderer
 type renderer struct {
@@ -61,24 +47,23 @@ func (v requestValidator) Validate(i any) error {
 type jsonSerializer struct{}
 
 func (s jsonSerializer) Serialize(c echo.Context, data any, indent string) error {
-	enc := json.NewEncoder(c.Response())
-	if indent != "" {
-		enc.SetIndent("", indent)
-	}
+	enc := gojson.NewEncoder(c.Response())
+	enc.SetIndent("", indent)
 	return enc.Encode(data)
 }
 
 func (s jsonSerializer) Deserialize(c echo.Context, v any) error {
-	err := json.NewDecoder(c.Request().Body).Decode(v)
-	if ute, ok := err.(*json.UnmarshalTypeError); ok {
+	dec := gojson.NewDecoder(c.Request().Body)
+	err := dec.Decode(v)
+	if ute, ok := err.(*gojson.UnmarshalTypeError); ok {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Unmarshal type error: expected=%v, got=%v, field=%v, offset=%v", ute.Type, ute.Value, ute.Field, ute.Offset)).SetInternal(err)
-	} else if se, ok := err.(*json.SyntaxError); ok {
+	} else if se, ok := err.(*gojson.SyntaxError); ok {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Syntax error: offset=%v, error=%v", se.Offset, se.Error())).SetInternal(err)
 	}
 	return err
 }
 
-func setUpRoutes(e *echo.Echo, h *Handler) {
+func mountRoutes(e *echo.Echo, h *Handler) {
 	e.GET("/metrics", echoprometheus.NewHandler())
 	e.GET("/swagger/*", echoSwagger.EchoWrapHandler())
 	e.GET("/config", h.GetConfig)
@@ -106,10 +91,13 @@ func New(svc *Service) (*echo.Echo, error) {
 	docs.SwaggerInfo.Host = net.JoinHostPort(h.Config.Host, h.Config.Port)
 
 	e := echo.New()
+
 	e.JSONSerializer = jsonSerializer{}
+
 	e.Validator = requestValidator{
 		validator: validator.New(),
 	}
+
 	e.IPExtractor = echo.ExtractIPFromXFFHeader(
 		echo.TrustLoopback(false),   // e.g. ipv4 start with 127.
 		echo.TrustLinkLocal(false),  // e.g. ipv4 start with 169.254
@@ -142,6 +130,7 @@ func New(svc *Service) (*echo.Echo, error) {
 	//Pre-router middlewares
 	if !h.Config.IsDev {
 		e.Pre(middleware.CSRF())
+		e.Pre(middleware.Secure())
 	}
 
 	e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{
@@ -149,8 +138,6 @@ func New(svc *Service) (*echo.Echo, error) {
 		AllowCredentials:                         true,
 		UnsafeWildcardOriginWithAllowCredentials: h.Config.IsDev,
 	}))
-
-	e.Pre(middleware.Secure())
 
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
 		Root:       "public",
@@ -160,7 +147,7 @@ func New(svc *Service) (*echo.Echo, error) {
 	// This middleware causes data races. See https://github.com/labstack/echo/issues/1761. But it's not a big deal.
 	e.Pre(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
 		Timeout: 10 * time.Second, Skipper: func(c echo.Context) bool {
-			return strings.HasPrefix(c.Request().URL.Path, "/debug/pprof")
+			return strings.HasPrefix(c.Path(), "/debug/pprof")
 		},
 	}))
 
@@ -247,6 +234,7 @@ func New(svc *Service) (*echo.Echo, error) {
 
 	pprof.Register(e)
 
-	setUpRoutes(e, &h)
+	mountRoutes(e, &h)
+
 	return e, nil
 }
