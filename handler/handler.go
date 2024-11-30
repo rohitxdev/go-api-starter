@@ -123,8 +123,17 @@ func New(svc *Service) (*echo.Echo, error) {
 			if err = c.JSON(httpErr.Code, res); err == nil {
 				return
 			}
+		} else {
+			msg := fmt.Sprintf("Something went wrong. Request ID: %s", c.Response().Header().Get(echo.HeaderXRequestID))
+			err = c.JSON(http.StatusInternalServerError, Response{Message: msg})
 		}
-		e.DefaultHTTPErrorHandler(err, c)
+		if err != nil {
+			h.Logger.Error().
+				Ctx(c.Request().Context()).
+				Err(err).
+				Str("id", c.Response().Header().Get(echo.HeaderXRequestID)).
+				Msg("HTTP error response failure")
+		}
 	}
 
 	//Pre-router middlewares
@@ -172,7 +181,7 @@ func New(svc *Service) (*echo.Echo, error) {
 			log := h.Logger.Info().
 				Ctx(c.Request().Context()).
 				Str("id", v.RequestID).
-				Str("remoteIp", v.RemoteIP).
+				Str("clientIp", v.RemoteIP).
 				Str("protocol", v.Protocol).
 				Str("uri", v.URI).
 				Str("method", v.Method).
@@ -196,7 +205,7 @@ func New(svc *Service) (*echo.Echo, error) {
 					log = log.Err(err)
 				}
 			} else {
-				log = log.Err(v.Error)
+				log = log.Err(v.Error).Int("status", http.StatusInternalServerError)
 			}
 
 			log.Msg("HTTP request")
@@ -221,9 +230,6 @@ func New(svc *Service) (*echo.Echo, error) {
 			h.Logger.Error().Ctx(c.Request().Context()).
 				Err(err).
 				Str("stack", string(stack)).
-				Str("method", c.Request().Method).
-				Str("path", c.Path()).
-				Str("ip", c.RealIP()).
 				Str("id", c.Response().Header().Get(echo.HeaderXRequestID)).
 				Msg("HTTP handler panic")
 			return nil

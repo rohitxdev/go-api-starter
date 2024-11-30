@@ -37,14 +37,15 @@ func bindAndValidate(c echo.Context, i any) error {
 	return err
 }
 
-func sanitizeEmail(email string) string {
-	emailParts := strings.Split(email, "@")
-	username := emailParts[0]
-	domain := emailParts[1]
+func canonicalizeEmail(email string) string {
+	email = strings.TrimSpace(email)
+	email = strings.ToLower(email)
+	parts := strings.Split(email, "@")
+	username := parts[0]
+	domain := parts[1]
 	if strings.Contains(username, "+") {
 		username = strings.Split(username, "+")[0]
 	}
-	username = strings.ReplaceAll(username, "-", "")
 	username = strings.ReplaceAll(username, ".", "")
 	return username + "@" + domain
 }

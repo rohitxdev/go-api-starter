@@ -49,7 +49,7 @@ func (h *Handler) LogIn(c echo.Context) error {
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
-	req.Email = sanitizeEmail(req.Email)
+	req.Email = canonicalizeEmail(req.Email)
 
 	user, err := h.Repo.GetUserByEmail(c.Request().Context(), req.Email)
 	if err != nil {
@@ -88,7 +88,7 @@ func (h *Handler) SignUp(c echo.Context) error {
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
-	req.Email = sanitizeEmail(req.Email)
+	req.Email = canonicalizeEmail(req.Email)
 
 	var userID uint64
 	_, err := h.Repo.GetUserByEmail(c.Request().Context(), req.Email)
@@ -212,7 +212,7 @@ func (h *Handler) SendResetPasswordEmail(c echo.Context) error {
 		return err
 	}
 
-	user, err := h.Repo.GetUserByEmail(c.Request().Context(), sanitizeEmail(req.Email))
+	user, err := h.Repo.GetUserByEmail(c.Request().Context(), canonicalizeEmail(req.Email))
 	if err != nil {
 		return c.JSON(http.StatusNotFound, Response{Message: "User not found"})
 	}
@@ -302,7 +302,7 @@ func (h *Handler) SendAccountVerificationEmail(c echo.Context) error {
 		return err
 	}
 
-	user, err := h.Repo.GetUserByEmail(c.Request().Context(), sanitizeEmail(req.Email))
+	user, err := h.Repo.GetUserByEmail(c.Request().Context(), canonicalizeEmail(req.Email))
 	if err != nil {
 		return c.JSON(http.StatusNotFound, Response{Message: "User not found"})
 	}
