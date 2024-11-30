@@ -12,7 +12,7 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
-// These variables are set by the build process.
+// These variables are set during compilation.
 var (
 	AppName    string
 	AppVersion string

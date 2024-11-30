@@ -228,7 +228,7 @@
             }
         },
         "/auth/reset-password": {
-            "get": {
+            "put": {
                 "description": "Reset password",
                 "consumes": [
                     "application/json"
@@ -379,7 +379,7 @@
             }
         },
         "/auth/verify-account": {
-            "get": {
+            "put": {
                 "description": "Verify account",
                 "consumes": [
                     "application/json"

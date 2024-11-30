@@ -31,13 +31,13 @@ func Run() error {
 		return fmt.Errorf("Failed to set maxprocs: %w", err)
 	}
 
-	//Load config.
+	// Load config.
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("Failed to load config: %w", err)
 	}
 
-	//Set up logger.
+	// Set up logger.
 	logr := logger.New(os.Stderr, cfg.IsDev)
 
 	logr.Debug().
@@ -48,24 +48,25 @@ func Run() error {
 		Str("platform", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)).
 		Msg("Running " + cfg.AppName)
 
-	//Connect to postgres database.
+	// Connect to KV store for caching.
+	kv, err := kvstore.New("kv", time.Minute*10)
+	if err != nil {
+		return fmt.Errorf("Failed to connect to KV store: %w", err)
+	}
+
+	// Connect to postgres database.
 	db, err := database.NewPostgreSQL(cfg.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to database: %w", err)
 	}
 
-	//Connect to KV store.
-	kv, err := kvstore.New("kv", time.Minute*5)
-	if err != nil {
-		return fmt.Errorf("Failed to connect to KV store: %w", err)
-	}
-
-	// Create repo.
+	// Create repo for interacting with the database.
 	r, err := repo.New(db)
 	if err != nil {
 		return fmt.Errorf("Failed to create repo: %w", err)
 	}
 
+	// Create blobstore for storing files.
 	bs, err := blobstore.New(cfg.S3Endpoint, cfg.S3DefaultRegion, cfg.AWSAccessKeyID, cfg.AWSAccessKeySecret)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to S3 client: %w", err)
@@ -101,7 +102,7 @@ func Run() error {
 	address := net.JoinHostPort(cfg.Host, cfg.Port)
 	isDevTLS := cfg.IsDev && cfg.UseDevTLS
 
-	//Start HTTP server.
+	// Start HTTP server.
 	go func() {
 		if isDevTLS {
 			// nolint
@@ -123,8 +124,8 @@ func Run() error {
 	}
 	logr.Info().Msg(fmt.Sprintf("Server is listening on %s://%s", proto, address))
 
+	// Shut down HTTP server gracefully.
 	ctx := context.Background()
-	//Shut down HTTP server gracefully.
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
 

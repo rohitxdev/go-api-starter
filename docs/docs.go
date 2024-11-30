@@ -239,7 +239,7 @@ const docTemplate = `{
             }
         },
         "/auth/reset-password": {
-            "get": {
+            "put": {
                 "description": "Reset password",
                 "consumes": [
                     "application/json"
@@ -390,7 +390,7 @@ const docTemplate = `{
             }
         },
         "/auth/verify-account": {
-            "get": {
+            "put": {
                 "description": "Verify account",
                 "consumes": [
                     "application/json"

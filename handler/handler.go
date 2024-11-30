@@ -79,9 +79,9 @@ func mountRoutes(e *echo.Echo, h *Handler) {
 		auth.GET("/access-token", h.GetAccessToken)
 		auth.PUT("/change-password", h.ChangePassword)
 		auth.POST("/reset-password", h.SendResetPasswordEmail)
-		auth.GET("/reset-password", h.ResetPassword)
+		auth.PUT("/reset-password", h.ResetPassword)
 		auth.POST("/verify-account", h.SendAccountVerificationEmail)
-		auth.GET("/verify-account", h.VerifyAccount)
+		auth.PUT("/verify-account", h.VerifyAccount)
 	}
 }
 
@@ -113,26 +113,30 @@ func New(svc *Service) (*echo.Echo, error) {
 	}
 
 	e.HTTPErrorHandler = func(err error, c echo.Context) {
+		defer func() {
+			if err != nil {
+				h.Logger.Error().
+					Ctx(c.Request().Context()).
+					Err(err).
+					Str("id", c.Response().Header().Get(echo.HeaderXRequestID)).
+					Msg("HTTP error response failure")
+			}
+		}()
+
 		var res Response
 		if httpErr, ok := err.(*echo.HTTPError); ok {
-			if msg, ok := httpErr.Message.(string); ok {
+			switch msg := httpErr.Message.(type) {
+			case string:
 				res.Message = msg
-			} else {
+			case error:
+				res.Message = msg.Error()
+			default:
 				res.Message = httpErr.Error()
 			}
-			if err = c.JSON(httpErr.Code, res); err == nil {
-				return
-			}
+			err = c.JSON(httpErr.Code, res)
 		} else {
-			msg := fmt.Sprintf("Something went wrong. Request ID: %s", c.Response().Header().Get(echo.HeaderXRequestID))
-			err = c.JSON(http.StatusInternalServerError, Response{Message: msg})
-		}
-		if err != nil {
-			h.Logger.Error().
-				Ctx(c.Request().Context()).
-				Err(err).
-				Str("id", c.Response().Header().Get(echo.HeaderXRequestID)).
-				Msg("HTTP error response failure")
+			res.Message = "Something went wrong"
+			err = c.JSON(http.StatusInternalServerError, res)
 		}
 	}
 
@@ -204,7 +208,8 @@ func New(svc *Service) (*echo.Echo, error) {
 				if err.Code == http.StatusInternalServerError {
 					log = log.Err(err)
 				}
-			} else {
+			} else if v.Error != nil {
+				// Due to a bug in echo, when the error is not an echo.HTTPError, even though the status code sent is 500, it's logged as 200 in this middleware. We need to manually set the status code in the log to 500.
 				log = log.Err(v.Error).Int("status", http.StatusInternalServerError)
 			}
 

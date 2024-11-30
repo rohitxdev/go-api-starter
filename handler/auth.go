@@ -44,7 +44,7 @@ func (h *Handler) LogOut(c echo.Context) error {
 func (h *Handler) LogIn(c echo.Context) error {
 	var req struct {
 		Email    string `form:"email" json:"email" validate:"required,email"`
-		Password string `form:"password" json:"password" validate:"required"`
+		Password string `form:"password" json:"password" validate:"required,min=8,max=128"`
 	}
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
@@ -83,7 +83,7 @@ func (h *Handler) LogIn(c echo.Context) error {
 func (h *Handler) SignUp(c echo.Context) error {
 	var req struct {
 		Email    string `form:"email" json:"email" validate:"required,email"`
-		Password string `form:"password" json:"password" validate:"required"`
+		Password string `form:"password" json:"password" validate:"required,min=8,max=128"`
 	}
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
@@ -226,6 +226,7 @@ func (h *Handler) SendResetPasswordEmail(c echo.Context) error {
 		FromAddress: h.Config.SenderEmail,
 		FromName:    h.Config.AppName,
 		ToAddresses: []string{req.Email},
+		NoStack:     true,
 	}
 	callbackURL, err := url.Parse(req.CallbackURL)
 	if err != nil {
@@ -255,11 +256,11 @@ func (h *Handler) SendResetPasswordEmail(c echo.Context) error {
 // @Success 200 {object} Response
 // @Failure 400 {object} Response
 // @Failure 500 {object} Response
-// @Router /auth/reset-password [get]
+// @Router /auth/reset-password [put]
 func (h *Handler) ResetPassword(c echo.Context) error {
 	var req struct {
-		Token       string `query:"token" validate:"required"`
-		NewPassword string `query:"newPassword" validate:"required,min=8,max=128"`
+		Token       string `form:"token" json:"token" validate:"required"`
+		NewPassword string `form:"newPassword" json:"newPassword" validate:"required,min=8,max=128"`
 	}
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
@@ -317,8 +318,9 @@ func (h *Handler) SendAccountVerificationEmail(c echo.Context) error {
 	emailOpts := email.BaseOpts{
 		Subject:     "Verify your account",
 		FromAddress: h.Config.SenderEmail,
-		FromName:    "Go App",
+		FromName:    h.Config.AppName,
 		ToAddresses: []string{req.Email},
+		NoStack:     true,
 	}
 	callbackURL, err := url.Parse(req.CallbackURL)
 	if err != nil {
@@ -347,10 +349,10 @@ func (h *Handler) SendAccountVerificationEmail(c echo.Context) error {
 // @Success 200 {object} Response
 // @Failure 400 {object} Response
 // @Failure 500 {object} Response
-// @Router /auth/verify-account [get]
+// @Router /auth/verify-account [put]
 func (h *Handler) VerifyAccount(c echo.Context) error {
 	var req struct {
-		Token string `query:"token" validate:"required"`
+		Token string `form:"token" json:"token" validate:"required"`
 	}
 	if err := bindAndValidate(c, &req); err != nil {
 		return err

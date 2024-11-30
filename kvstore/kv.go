@@ -1,3 +1,4 @@
+// This package provides a persistent key-value store.
 package kvstore
 
 import (

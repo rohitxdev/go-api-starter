@@ -3,10 +3,10 @@
 
     <head>
         {{ template "header" . }}
-        <title>Go + Echo</title>
+        <title>{{ .appName }} API</title>
     </head>
 
-    <body class="flex flex-col items-center min-h-screen w-screen text-center font-semibold gap-4 pt-24">
+    <body class="flex flex-col items-center min-h-screen w-screen text-center font-semibold gap-4 pt-24 bg-neutral-100">
         <h1 class="text-4xl">{{ .appName }} API</h1>
         <p class="text-sm font-medium">{{ .appVersion }}</p>
         <img src="/images/go-fast.png" alt="Gopher running fast" width="256" height="256" />
