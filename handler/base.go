@@ -42,7 +42,8 @@ type Handler struct {
 // @Success 200 {html} string "home page"
 func (h *Handler) GetHome(c echo.Context) error {
 	return c.Render(http.StatusOK, "home", echo.Map{
-		"appName": h.Config.AppName,
+		"appName":    h.Config.AppName,
+		"appVersion": h.Config.AppVersion,
 	})
 }
 
