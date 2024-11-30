@@ -41,7 +41,9 @@ type Handler struct {
 // @Router / [get]
 // @Success 200 {html} string "home page"
 func (h *Handler) GetHome(c echo.Context) error {
-	return c.Render(http.StatusOK, "home", nil)
+	return c.Render(http.StatusOK, "home", echo.Map{
+		"appName": h.Config.AppName,
+	})
 }
 
 type ClientConfig struct {

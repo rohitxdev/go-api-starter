@@ -1,54 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
-<style>
-    :root{
-        color-scheme: light dark;
-    }
-    
-    body{
-        display: grid;
-        place-content: center;
-        place-items: center;
-        font-family: monospace;
-        text-align: center;
-    }
+    <head>
+        {{ template "header" . }}
+        <title>Go + Echo</title>
+    </head>
 
-    ul{
-        list-style: none;
-        text-align: center;
-    }
-    
-    li{
-        line-height: 1.5;
-    }
-
-    span[scope="row"]{
-        font-weight: bold;
-    }
-</style>
-
-<head>
-    <meta charset='utf-8' />
-    <meta http-equiv='X-UA-Compatible' content='IE=edge' />
-    <meta name='viewport' content='width=device-width, initial-scale=1' />
-    <link rel="shortcut icon" href="/go-fast.png" type="image/png">
-    <title>Go + Echo</title>
-</head>
-
-<body>
-    <h1>Go + Echo API</h1>
-    <img src="/images/go-fast.png" alt="Gopher running fast" height="200" width="200"/>
-    <ul>
-        {{range $k,$v := .}}
-        <li>
-            <span scope="row">{{$k}}</span>
-            <span>-</span>
-            <span>{{$v}}</span>
-        </li>
-        {{end}}
-    </ul>
-    <p>Read the <a href="/swagger/index.html">Swagger documentation</a> to learn more about the API.</p>
-</body>
+    <body class="flex flex-col items-center min-h-screen w-screen text-center font-semibold gap-4 pt-24">
+        <h1 class="text-4xl">{{ .appName }} API</h1>
+        <img src="/images/go-fast.png" alt="Gopher running fast" width="256" height="256" />
+        <a class="border-2 border-black bg-black text-white rounded-md px-4 py-2" href="/swagger/index.html">
+            View API Docs
+        </a>
+    </body>
 
 </html>
