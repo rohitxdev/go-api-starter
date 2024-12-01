@@ -23,7 +23,7 @@ func GenerateLoginToken(tokenClaims TokenClaims, jwtSecret string, expiresIn tim
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenStr, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
-		return "", fmt.Errorf("Failed to generate login token: %w", err)
+		return "", fmt.Errorf("failed to generate login token: %w", err)
 	}
 	return tokenStr, nil
 }
@@ -37,11 +37,11 @@ func ValidateLoginToken(tokenStr string, jwtSecret string) (*TokenClaims, error)
 		return []byte(jwtSecret), nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to validate login token: %w", err)
+		return nil, fmt.Errorf("failed to validate login token: %w", err)
 	}
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return nil, fmt.Errorf("Failed to validate login token: invalid claims")
+		return nil, fmt.Errorf("failed to validate login token: invalid claims")
 	}
 	tokenClaims := TokenClaims{
 		UserID:   uint64(claims["userId"].(float64)),

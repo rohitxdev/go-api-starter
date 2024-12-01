@@ -20,10 +20,10 @@ func createDirIfNotExists(path string) error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			if err = os.Mkdir(path, 0755); err != nil {
-				return fmt.Errorf("Failed to create directory: %w", err)
+				return fmt.Errorf("failed to create directory: %w", err)
 			}
 		} else {
-			return fmt.Errorf("Failed to get stats of directory: %w", err)
+			return fmt.Errorf("failed to get stats of directory: %w", err)
 		}
 	} else if !info.IsDir() {
 		return fmt.Errorf("%s is not a directory", path)
@@ -42,7 +42,7 @@ func NewSQLite(dbName string) (*sql.DB, error) {
 
 	db, err := sql.Open("sqlite", dbName)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to open sqlite database: %w", err)
+		return nil, fmt.Errorf("failed to open sqlite database: %w", err)
 	}
 
 	stmts := [...]string{
@@ -67,7 +67,7 @@ func NewSQLite(dbName string) (*sql.DB, error) {
 	}
 
 	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("Failed to ping sqlite database: %w", err)
+		return nil, fmt.Errorf("failed to ping sqlite database: %w", err)
 	}
 
 	return db, nil
@@ -77,10 +77,10 @@ func NewSQLite(dbName string) (*sql.DB, error) {
 func NewPostgreSQL(uri string) (*sql.DB, error) {
 	db, err := sql.Open("pgx", uri)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to open postgres database: %w", err)
+		return nil, fmt.Errorf("failed to open postgres database: %w", err)
 	}
 	if err = db.Ping(); err != nil {
-		return nil, fmt.Errorf("Failed to ping postgres database: %w", err)
+		return nil, fmt.Errorf("failed to ping postgres database: %w", err)
 	}
 	return db, nil
 }

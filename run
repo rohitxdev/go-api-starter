@@ -97,6 +97,8 @@ build() {
         -ldflags='-s -w -X $PACKAGE_NAME/config.AppName=$APP_NAME -X $PACKAGE_NAME/config.AppVersion=$APP_VERSION -X $PACKAGE_NAME/config.BuildType=release -extldflags \"-static\"' \
         --trimpath -o $build_file_path ."
 
+    go mod tidy
+
     print loading "Verifying modules"
     if ! go mod verify &>/dev/null; then
         print error "Modules verification failed"

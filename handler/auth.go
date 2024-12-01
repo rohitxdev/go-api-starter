@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 
 	"github.com/labstack/echo/v4"
 	"github.com/rohitxdev/go-api-starter/cryptoutil"
@@ -11,75 +12,6 @@ import (
 	"github.com/rohitxdev/go-api-starter/repo"
 )
 
-// @Summary Log out
-// @Description Log out
-// @Tags Auth
-// @Accept json
-// @Produce json
-// @Success 200 {object} Response
-// @Failure 401 {object} Response
-// @Failure 500 {object} Response
-// @Router /auth/logout [get]
-func (h *Handler) LogOut(c echo.Context) error {
-	_, err := c.Cookie("refreshToken")
-	if err != nil {
-		return c.JSON(http.StatusUnauthorized, Response{Message: "User is not logged in"})
-	}
-	clearAuthCookies(c)
-	return c.JSON(http.StatusOK, Response{Message: "Logged out successfully", Success: true})
-}
-
-// @Summary Log in
-// @Description Log in
-// @Tags Auth
-// @Accept json
-// @Produce json
-// @Param email formData string true "Email"
-// @Param password formData string true "Password"
-// @Success 200 {object} Response
-// @Failure 400 {object} Response
-// @Failure 401 {object} Response
-// @Failure 500 {object} Response
-// @Router /auth/log-in [post]
-func (h *Handler) LogIn(c echo.Context) error {
-	var req struct {
-		Email    string `form:"email" json:"email" validate:"required,email"`
-		Password string `form:"password" json:"password" validate:"required,min=8,max=128"`
-	}
-	if err := bindAndValidate(c, &req); err != nil {
-		return err
-	}
-	req.Email = canonicalizeEmail(req.Email)
-
-	user, err := h.Repo.GetUserByEmail(c.Request().Context(), req.Email)
-	if err != nil {
-		return c.JSON(http.StatusNotFound, Response{Message: "User not found"})
-	}
-
-	if !cryptoutil.VerifyPassword(req.Password, user.PasswordHash) {
-		return c.JSON(http.StatusUnauthorized, Response{Message: "Incorrect password"})
-	}
-
-	if err = setAccessTokenCookie(c, h.Config.AccessTokenExpiresIn, user.ID, h.Config.AccessTokenSecret); err != nil {
-		return fmt.Errorf("failed to set access token cookie: %w", err)
-	}
-	if err = setRefreshTokenCookie(c, h.Config.RefreshTokenExpiresIn, user.ID, h.Config.RefreshTokenSecret); err != nil {
-		return fmt.Errorf("failed to set refresh token cookie: %w", err)
-	}
-	return c.JSON(http.StatusOK, Response{Message: "Logged in successfully", Success: true})
-}
-
-// @Summary Sign up
-// @Description Sign up
-// @Tags Auth
-// @Accept json
-// @Produce json
-// @Param email formData string true "Email"
-// @Param password formData string true "Password"
-// @Success 200 {object} Response
-// @Failure 400 {object} Response
-// @Failure 500 {object} Response
-// @Router /auth/signup [post]
 func (h *Handler) SignUp(c echo.Context) error {
 	var req struct {
 		Email    string `form:"email" json:"email" validate:"required,email"`
@@ -116,18 +48,46 @@ func (h *Handler) SignUp(c echo.Context) error {
 	if err = setRefreshTokenCookie(c, h.Config.RefreshTokenExpiresIn, userID, h.Config.RefreshTokenSecret); err != nil {
 		return fmt.Errorf("failed to set refresh token cookie: %w", err)
 	}
-	return c.JSON(http.StatusCreated, Response{Message: "Signed up successfully", Success: true})
+	return c.JSON(http.StatusOK, Response{Message: "Signed up successfully", Success: true})
 }
 
-// @Summary Get access token
-// @Description Get access token
-// @Tags Auth
-// @Accept json
-// @Produce json
-// @Success 200 {object} Response
-// @Failure 401 {object} Response
-// @Failure 500 {object} Response
-// @Router /auth/access-token [get]
+func (h *Handler) LogIn(c echo.Context) error {
+	var req struct {
+		Email    string `form:"email" json:"email" validate:"required,email"`
+		Password string `form:"password" json:"password" validate:"required,min=8,max=128"`
+	}
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
+	}
+	req.Email = canonicalizeEmail(req.Email)
+
+	user, err := h.Repo.GetUserByEmail(c.Request().Context(), req.Email)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, Response{Message: "User not found"})
+	}
+
+	if !cryptoutil.VerifyPassword(req.Password, user.PasswordHash) {
+		return c.JSON(http.StatusUnauthorized, Response{Message: "Incorrect password"})
+	}
+
+	if err = setAccessTokenCookie(c, h.Config.AccessTokenExpiresIn, user.ID, h.Config.AccessTokenSecret); err != nil {
+		return fmt.Errorf("failed to set access token cookie: %w", err)
+	}
+	if err = setRefreshTokenCookie(c, h.Config.RefreshTokenExpiresIn, user.ID, h.Config.RefreshTokenSecret); err != nil {
+		return fmt.Errorf("failed to set refresh token cookie: %w", err)
+	}
+	return c.JSON(http.StatusOK, Response{Message: "Logged in successfully", Success: true})
+}
+
+func (h *Handler) LogOut(c echo.Context) error {
+	_, err := c.Cookie("refreshToken")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, Response{Message: "User is not logged in"})
+	}
+	clearAuthCookies(c)
+	return c.JSON(http.StatusOK, Response{Message: "Logged out successfully", Success: true})
+}
+
 func (h *Handler) GetAccessToken(c echo.Context) error {
 	refreshToken, err := c.Cookie("refreshToken")
 	if err != nil {
@@ -158,19 +118,7 @@ func (h *Handler) GetAccessToken(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Message: "Generated access token successfully", Success: true})
 }
 
-// @Summary Change password
-// @Description Change password
-// @Tags Auth
-// @Accept json
-// @Produce json
-// @Param currentPassword formData string true "Current password"
-// @Param newPassword formData string true "New password"
-// @Success 200 {object} Response
-// @Failure 401 {object} Response
-// @Failure 400 {object} Response
-// @Failure 500 {object} Response
-// @Router /auth/change-password [post]
-func (h *Handler) ChangePassword(c echo.Context) error {
+func (h *Handler) UpdatePassword(c echo.Context) error {
 	user, err := h.checkAuth(c, RoleUser)
 	if err != nil {
 		return err
@@ -192,17 +140,6 @@ func (h *Handler) ChangePassword(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Message: "Password updated successfully", Success: true})
 }
 
-// @Summary Send reset password email
-// @Description Send reset password email
-// @Tags Auth
-// @Accept json
-// @Produce json
-// @Param email formData string true "Email"
-// @Param callbackUrl formData string true "Callback URL"
-// @Success 200 {object} Response
-// @Failure 400 {object} Response
-// @Failure 500 {object} Response
-// @Router /auth/reset-password [post]
 func (h *Handler) SendResetPasswordEmail(c echo.Context) error {
 	var req struct {
 		Email       string `form:"email" json:"email" validate:"required,email"`
@@ -221,6 +158,19 @@ func (h *Handler) SendResetPasswordEmail(c echo.Context) error {
 		return err
 	}
 
+	callbackURL, err := url.Parse(req.CallbackURL)
+	if err != nil {
+		return err
+	}
+
+	if !h.Config.IsDev && !slices.Contains(h.Config.AllowedOrigins, callbackURL.Hostname()) {
+		return c.JSON(http.StatusBadRequest, Response{Message: "Unauthorized origin for callback URL"})
+	}
+
+	query := callbackURL.Query()
+	query.Add("token", resetToken)
+	callbackURL.RawQuery = query.Encode()
+
 	emailOpts := email.BaseOpts{
 		Subject:     "Reset your password",
 		FromAddress: h.Config.SenderEmail,
@@ -228,14 +178,6 @@ func (h *Handler) SendResetPasswordEmail(c echo.Context) error {
 		ToAddresses: []string{req.Email},
 		NoStack:     true,
 	}
-	callbackURL, err := url.Parse(req.CallbackURL)
-	if err != nil {
-		return err
-	}
-	query := callbackURL.Query()
-	query.Add("token", resetToken)
-	callbackURL.RawQuery = query.Encode()
-
 	data := map[string]any{
 		"callbackURL":  callbackURL.String(),
 		"validMinutes": h.Config.CommonTokenExpiresIn.Minutes(),
@@ -246,17 +188,6 @@ func (h *Handler) SendResetPasswordEmail(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Message: "Sent password reset email successfully", Success: true})
 }
 
-// @Summary Reset password
-// @Description Reset password
-// @Tags Auth
-// @Accept json
-// @Produce json
-// @Param token formData string true "Token"
-// @Param newPassword formData string true "New password"
-// @Success 200 {object} Response
-// @Failure 400 {object} Response
-// @Failure 500 {object} Response
-// @Router /auth/reset-password [put]
 func (h *Handler) ResetPassword(c echo.Context) error {
 	var req struct {
 		Token       string `form:"token" json:"token" validate:"required"`
@@ -283,17 +214,6 @@ func (h *Handler) ResetPassword(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Message: "Password updated successfully", Success: true})
 }
 
-// @Summary Send account verification email
-// @Description Send account verification email
-// @Tags Auth
-// @Accept json
-// @Produce json
-// @Param email formData string true "Email"
-// @Param callbackUrl formData string true "Callback URL"
-// @Success 200 {object} Response
-// @Failure 400 {object} Response
-// @Failure 500 {object} Response
-// @Router /auth/verify-account [post]
 func (h *Handler) SendAccountVerificationEmail(c echo.Context) error {
 	var req struct {
 		Email       string `form:"email" json:"email" validate:"required,email"`
@@ -315,6 +235,19 @@ func (h *Handler) SendAccountVerificationEmail(c echo.Context) error {
 		return err
 	}
 
+	callbackURL, err := url.Parse(req.CallbackURL)
+	if err != nil {
+		return err
+	}
+
+	if !h.Config.IsDev && !slices.Contains(h.Config.AllowedOrigins, callbackURL.Hostname()) {
+		return c.JSON(http.StatusBadRequest, Response{Message: "Unauthorized origin for callback URL"})
+	}
+
+	query := callbackURL.Query()
+	query.Add("token", verificationToken)
+	callbackURL.RawQuery = query.Encode()
+
 	emailOpts := email.BaseOpts{
 		Subject:     "Verify your account",
 		FromAddress: h.Config.SenderEmail,
@@ -322,14 +255,6 @@ func (h *Handler) SendAccountVerificationEmail(c echo.Context) error {
 		ToAddresses: []string{req.Email},
 		NoStack:     true,
 	}
-	callbackURL, err := url.Parse(req.CallbackURL)
-	if err != nil {
-		return err
-	}
-	query := callbackURL.Query()
-	query.Add("token", verificationToken)
-	callbackURL.RawQuery = query.Encode()
-
 	data := map[string]any{
 		"callbackURL":  callbackURL.String(),
 		"validMinutes": h.Config.CommonTokenExpiresIn.Minutes(),
@@ -340,16 +265,6 @@ func (h *Handler) SendAccountVerificationEmail(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Message: "Sent verification email successfully", Success: true})
 }
 
-// @Summary Verify account
-// @Description Verify account
-// @Tags Auth
-// @Accept json
-// @Produce json
-// @Param token formData string true "Token"
-// @Success 200 {object} Response
-// @Failure 400 {object} Response
-// @Failure 500 {object} Response
-// @Router /auth/verify-account [put]
 func (h *Handler) VerifyAccount(c echo.Context) error {
 	var req struct {
 		Token string `form:"token" json:"token" validate:"required"`
@@ -373,4 +288,26 @@ func (h *Handler) VerifyAccount(c echo.Context) error {
 		return err
 	}
 	return c.JSON(http.StatusOK, Response{Message: "Account verified successfully", Success: true})
+}
+
+func (h *Handler) GetCurrentUser(c echo.Context) error {
+	user, err := h.checkAuth(c, RoleUser)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, ResponseWithPayload[repo.PublicUser]{
+		Message: "Fetched current user successfully",
+		Success: true,
+		Payload: repo.PublicUser{
+			ID:          user.ID,
+			Role:        user.Role,
+			Email:       user.Email,
+			Username:    user.Username,
+			ImageURL:    user.ImageURL,
+			Gender:      user.Gender,
+			DateOfBirth: user.DateOfBirth,
+			CreatedAt:   user.CreatedAt,
+			UpdatedAt:   user.UpdatedAt,
+		},
+	})
 }

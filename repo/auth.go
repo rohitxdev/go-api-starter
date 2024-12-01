@@ -63,7 +63,7 @@ func (repo *Repo) GetUserById(ctx context.Context, userID uint64) (*User, error)
 			case "undefined_column":
 				return nil, ErrUserNotFound
 			default:
-				return nil, fmt.Errorf("Failed to get user by id: %w", err)
+				return nil, fmt.Errorf("failed to get user by id: %w", err)
 			}
 		}
 		return nil, err
@@ -84,7 +84,7 @@ func (repo *Repo) GetUserByEmail(ctx context.Context, email string) (*User, erro
 			case "undefined_column":
 				return nil, ErrUserNotFound
 			default:
-				return nil, fmt.Errorf("Failed to get user by email: %w", err)
+				return nil, fmt.Errorf("failed to get user by email: %w", err)
 			}
 		}
 		return nil, err

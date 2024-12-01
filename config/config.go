@@ -63,11 +63,11 @@ func Load() (*Config, error) {
 
 	if configFile := os.Getenv("CONFIG_FILE"); configFile != "" {
 		if m, err = loadFromFile(configFile); err != nil {
-			return nil, fmt.Errorf("Failed to load secrets file: %w", err)
+			return nil, fmt.Errorf("failed to load secrets file: %w", err)
 		}
 	} else if configJSON := os.Getenv("CONFIG_JSON"); configJSON != "" {
 		if m, err = loadFromJSON(configJSON); err != nil {
-			return nil, fmt.Errorf("Failed to load secrets JSON: %w", err)
+			return nil, fmt.Errorf("failed to load secrets JSON: %w", err)
 		}
 	} else {
 		return nil, errors.New("CONFIG_FILE or CONFIG_JSON must be set")
@@ -76,16 +76,16 @@ func Load() (*Config, error) {
 	var errList []error
 
 	if m["shutdownTimeout"], err = time.ParseDuration(m["shutdownTimeout"].(string)); err != nil {
-		errList = append(errList, fmt.Errorf("Failed to parse shutdown timeout: %w", err))
+		errList = append(errList, fmt.Errorf("failed to parse shutdown timeout: %w", err))
 	}
 	if m["accessTokenExpiresIn"], err = time.ParseDuration(m["accessTokenExpiresIn"].(string)); err != nil {
-		errList = append(errList, fmt.Errorf("Failed to parse session duration: %w", err))
+		errList = append(errList, fmt.Errorf("failed to parse session duration: %w", err))
 	}
 	if m["refreshTokenExpiresIn"], err = time.ParseDuration(m["refreshTokenExpiresIn"].(string)); err != nil {
-		errList = append(errList, fmt.Errorf("Failed to parse session duration: %w", err))
+		errList = append(errList, fmt.Errorf("failed to parse session duration: %w", err))
 	}
 	if m["commonTokenExpiresIn"], err = time.ParseDuration(m["commonTokenExpiresIn"].(string)); err != nil {
-		errList = append(errList, fmt.Errorf("Failed to parse log in token expires in: %w", err))
+		errList = append(errList, fmt.Errorf("failed to parse log in token expires in: %w", err))
 	}
 
 	if len(errList) > 0 {
@@ -94,12 +94,12 @@ func Load() (*Config, error) {
 
 	data, err := json.Marshal(m)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to marshal config: %w", err)
+		return nil, fmt.Errorf("failed to marshal config: %w", err)
 	}
 
 	var cfg Config
 	if err = json.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("Failed to unmarshal config: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
 	cfg.GoogleOAuth2Config = &oauth2.Config{
@@ -115,7 +115,7 @@ func Load() (*Config, error) {
 	cfg.IsDev = cfg.Env != "production"
 
 	if err = validator.New().Struct(cfg); err != nil {
-		return nil, fmt.Errorf("Failed to validate config: %w", err)
+		return nil, fmt.Errorf("failed to validate config: %w", err)
 	}
 
 	return &cfg, err
@@ -124,11 +124,11 @@ func Load() (*Config, error) {
 func loadFromFile(configFile string) (map[string]any, error) {
 	data, err := os.ReadFile(configFile)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read secrets file: %w", err)
+		return nil, fmt.Errorf("failed to read secrets file: %w", err)
 	}
 	var m map[string]any
 	if err = json.Unmarshal(data, &m); err != nil {
-		return nil, fmt.Errorf("Failed to unmarshal secrets file: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal secrets file: %w", err)
 	}
 	return m, nil
 }
@@ -136,7 +136,7 @@ func loadFromFile(configFile string) (map[string]any, error) {
 func loadFromJSON(jsonData string) (map[string]any, error) {
 	var m map[string]any
 	if err := json.Unmarshal([]byte(jsonData), &m); err != nil {
-		return nil, fmt.Errorf("Failed to unmarshal secrets json: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal secrets json: %w", err)
 	}
 	return m, nil
 }

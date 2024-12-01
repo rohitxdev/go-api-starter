@@ -17,10 +17,37 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/oklog/ulid/v2"
 	"github.com/rohitxdev/go-api-starter/assets"
+	"github.com/rohitxdev/go-api-starter/blobstore"
+	"github.com/rohitxdev/go-api-starter/config"
 	"github.com/rohitxdev/go-api-starter/docs"
+	"github.com/rohitxdev/go-api-starter/email"
+	"github.com/rohitxdev/go-api-starter/kvstore"
 	"github.com/rohitxdev/go-api-starter/repo"
-	echoSwagger "github.com/swaggo/echo-swagger"
+	"github.com/rs/zerolog"
 )
+
+type Service struct {
+	BlobStore *blobstore.Store
+	Config    *config.Config
+	Email     *email.Client
+	KVStore   *kvstore.Store
+	Logger    *zerolog.Logger
+	Repo      *repo.Repo
+}
+
+func (s *Service) Close() error {
+	if err := s.KVStore.Close(); err != nil {
+		return fmt.Errorf("failed to close KV store: %w", err)
+	}
+	if err := s.Repo.Close(); err != nil {
+		return fmt.Errorf("failed to close repo: %w", err)
+	}
+	return nil
+}
+
+type Handler struct {
+	*Service
+}
 
 // Custom view renderer
 type renderer struct {
@@ -61,28 +88,6 @@ func (s jsonSerializer) Deserialize(c echo.Context, v any) error {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Syntax error: offset=%v, error=%v", se.Offset, se.Error())).SetInternal(err)
 	}
 	return err
-}
-
-func mountRoutes(e *echo.Echo, h *Handler) {
-	e.GET("/metrics", echoprometheus.NewHandler())
-	e.GET("/swagger/*", echoSwagger.EchoWrapHandler())
-	e.GET("/config", h.GetConfig)
-	e.GET("/me", h.GetMe)
-	e.GET("/_", h.GetAdmin)
-	e.GET("/", h.GetHome)
-
-	auth := e.Group("/auth")
-	{
-		auth.POST("/sign-up", h.SignUp)
-		auth.POST("/log-in", h.LogIn)
-		auth.GET("/log-out", h.LogOut)
-		auth.GET("/access-token", h.GetAccessToken)
-		auth.PUT("/change-password", h.ChangePassword)
-		auth.POST("/reset-password", h.SendResetPasswordEmail)
-		auth.PUT("/reset-password", h.ResetPassword)
-		auth.POST("/verify-account", h.SendAccountVerificationEmail)
-		auth.PUT("/verify-account", h.VerifyAccount)
-	}
 }
 
 func New(svc *Service) (*echo.Echo, error) {

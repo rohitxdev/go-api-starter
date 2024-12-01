@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/rohitxdev/go-api-starter/cryptoutil"
 	"github.com/rohitxdev/go-api-starter/repo"
+	"golang.org/x/time/rate"
 )
 
 type Response struct {
@@ -139,4 +141,29 @@ func clearAuthCookies(c echo.Context) {
 		HttpOnly: true,
 		Secure:   true,
 	})
+}
+
+// This rate limiter does not enforce strict rate limiting but it's good enough for use at application level.
+func rateLimiter(isEnabled bool) func(reqs int, every time.Duration) echo.MiddlewareFunc {
+	return func(reqs int, every time.Duration) echo.MiddlewareFunc {
+		store := middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
+			Rate:      rate.Every(every / time.Duration(reqs)),
+			Burst:     reqs,
+			ExpiresIn: every,
+		})
+		if !isEnabled {
+			store = middleware.NewRateLimiterMemoryStore(rate.Inf)
+		}
+
+		rc := middleware.DefaultRateLimiterConfig
+		rc.Store = store
+		rc.DenyHandler = func(c echo.Context, id string, err error) error {
+			return echo.NewHTTPError(http.StatusTooManyRequests, "Too many requests. Please try again later.")
+		}
+		rc.ErrorHandler = func(c echo.Context, err error) error {
+			return err
+		}
+
+		return middleware.RateLimiterWithConfig(rc)
+	}
 }

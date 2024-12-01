@@ -32,7 +32,7 @@ type Client struct {
 func New(c *SMTPCredentials) (*Client, error) {
 	t, err := template.ParseFS(assets.FS, "templates/emails/*.tmpl")
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse email templates: %w", err)
+		return nil, fmt.Errorf("failed to parse email templates: %w", err)
 	}
 
 	dialer := gomail.NewDialer(c.Host, c.Port, c.Username, c.Password)
@@ -105,7 +105,7 @@ func (c *Client) send(opts *BaseOpts, mimeType string, body string, attachments 
 	}
 
 	if err := c.dialer.DialAndSend(msg); err != nil {
-		return fmt.Errorf("Failed to send email: %w", err)
+		return fmt.Errorf("failed to send email: %w", err)
 	}
 	return nil
 }
@@ -115,7 +115,7 @@ func (c *Client) SendHTML(opts *BaseOpts, templateName string, data map[string]a
 	var buf bytes.Buffer
 	if err := c.templates.ExecuteTemplate(&buf, templateName+".tmpl", data); err != nil {
 		// '%q' prints the template name in quotes
-		return fmt.Errorf("Failed to execute template %q: %w", templateName, err)
+		return fmt.Errorf("failed to execute template %q: %w", templateName, err)
 	}
 	return c.send(opts, "text/html", buf.String(), attachments...)
 }

@@ -28,13 +28,13 @@ import (
 func Run() error {
 	// Set GOMAXPROCS to match the Linux container CPU quota.
 	if _, err := maxprocs.Set(); err != nil {
-		return fmt.Errorf("Failed to set maxprocs: %w", err)
+		return fmt.Errorf("failed to set maxprocs: %w", err)
 	}
 
 	// Load config.
 	cfg, err := config.Load()
 	if err != nil {
-		return fmt.Errorf("Failed to load config: %w", err)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	// Set up logger.
@@ -51,25 +51,25 @@ func Run() error {
 	// Connect to KV store for caching.
 	kv, err := kvstore.New("kv", time.Minute*10)
 	if err != nil {
-		return fmt.Errorf("Failed to connect to KV store: %w", err)
+		return fmt.Errorf("failed to connect to KV store: %w", err)
 	}
 
 	// Connect to postgres database.
 	db, err := database.NewPostgreSQL(cfg.DatabaseURL)
 	if err != nil {
-		return fmt.Errorf("Failed to connect to database: %w", err)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	// Create repo for interacting with the database.
 	r, err := repo.New(db)
 	if err != nil {
-		return fmt.Errorf("Failed to create repo: %w", err)
+		return fmt.Errorf("failed to create repo: %w", err)
 	}
 
 	// Create blobstore for storing files.
 	bs, err := blobstore.New(cfg.S3Endpoint, cfg.S3DefaultRegion, cfg.AWSAccessKeyID, cfg.AWSAccessKeySecret)
 	if err != nil {
-		return fmt.Errorf("Failed to connect to S3 client: %w", err)
+		return fmt.Errorf("failed to connect to S3 client: %w", err)
 	}
 
 	e, err := email.New(&email.SMTPCredentials{
@@ -80,7 +80,7 @@ func Run() error {
 		InsecureSkipVerify: true,
 	})
 	if err != nil {
-		return fmt.Errorf("Failed to create email client: %w", err)
+		return fmt.Errorf("failed to create email client: %w", err)
 	}
 
 	s := handler.Service{
@@ -95,7 +95,7 @@ func Run() error {
 
 	h, err := handler.New(&s)
 	if err != nil {
-		return fmt.Errorf("Failed to create HTTP handler: %w", err)
+		return fmt.Errorf("failed to create HTTP handler: %w", err)
 	}
 
 	errCh := make(chan error)
@@ -135,13 +135,13 @@ func Run() error {
 		defer cancel()
 
 		if err = h.Shutdown(ctx); err != nil {
-			return fmt.Errorf("Failed to shutdown HTTP server: %w", err)
+			return fmt.Errorf("failed to shutdown HTTP server: %w", err)
 		}
 
 		logr.Debug().Msg("HTTP server shut down gracefully")
 	case err = <-errCh:
 		if err != nil && !errors.Is(err, net.ErrClosed) {
-			err = fmt.Errorf("Failed to start HTTP server: %w", err)
+			err = fmt.Errorf("failed to start HTTP server: %w", err)
 		}
 	}
 	return err

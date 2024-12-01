@@ -28,4 +28,3 @@ Run the production server:
 
 - The `run` script is used to automate common development/production tasks. Run `./run` to see the available tasks.
 - The config/secrets should be stored in a `config.json` file in the root directory. If you want to use a different file, you can specify it using the `CONFIG_FILE` environment variable.
-- HTTPS and Rate limiting should be handled at the reverse proxy level in production, not at the API level.

@@ -56,7 +56,7 @@ func TestRootRoutes(t *testing.T) {
 	cfg, err := config.Load()
 	t.Log()
 	if err != nil {
-		panic("Failed to load config: " + err.Error())
+		panic("failed to load config: " + err.Error())
 	}
 
 	//Set up logger
@@ -64,12 +64,12 @@ func TestRootRoutes(t *testing.T) {
 	//Connect to postgres database
 	db, err := database.NewPostgreSQL(cfg.DatabaseURL)
 	if err != nil {
-		panic("Failed to connect to database: " + err.Error())
+		panic("failed to connect to database: " + err.Error())
 	}
 	logr.Debug().Msg("Connected to database")
 	defer func() {
 		if err = db.Close(); err != nil {
-			panic("Failed to close database: " + err.Error())
+			panic("failed to close database: " + err.Error())
 		}
 		logr.Debug().Msg("Database connection closed")
 	}()
@@ -77,7 +77,7 @@ func TestRootRoutes(t *testing.T) {
 	//Connect to KV store
 	kv, err := kvstore.New("kv", time.Minute*5)
 	if err != nil {
-		panic("Failed to connect to KV store: " + err.Error())
+		panic("failed to connect to KV store: " + err.Error())
 	}
 
 	logr.Debug().Msg("Connected to KV store")
@@ -89,13 +89,13 @@ func TestRootRoutes(t *testing.T) {
 	// Create repo
 	r, err := repo.New(db)
 	if err != nil {
-		panic("Failed to create repo: " + err.Error())
+		panic("failed to create repo: " + err.Error())
 	}
 	defer r.Close()
 
 	bs, err := blobstore.New(cfg.S3Endpoint, cfg.S3DefaultRegion, cfg.AWSAccessKeyID, cfg.AWSAccessKeySecret)
 	if err != nil {
-		panic("Failed to connect to S3 client: " + err.Error())
+		panic("failed to connect to S3 client: " + err.Error())
 	}
 	e, err := email.New(&email.SMTPCredentials{})
 	assert.Nil(t, err)
