@@ -143,13 +143,13 @@ func clearAuthCookies(c echo.Context) {
 	})
 }
 
-// This rate limiter does not enforce strict rate limiting but it's good enough for use at application level.
-func rateLimiter(isEnabled bool) func(reqs int, every time.Duration) echo.MiddlewareFunc {
-	return func(reqs int, every time.Duration) echo.MiddlewareFunc {
+// This is a token bucket rate limiter. It does not enforce strict rate limiting but it's good enough for use as second level of defense at application level.
+func rateLimiter(isEnabled bool) func(reqs int, window time.Duration) echo.MiddlewareFunc {
+	// 'reqs' is the max number of requests allowed in 'window' time window.
+	return func(reqs int, window time.Duration) echo.MiddlewareFunc {
 		store := middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
-			Rate:      rate.Every(every / time.Duration(reqs)),
-			Burst:     reqs,
-			ExpiresIn: every,
+			Rate:  rate.Every(window / time.Duration(reqs)),
+			Burst: reqs,
 		})
 		if !isEnabled {
 			store = middleware.NewRateLimiterMemoryStore(rate.Inf)

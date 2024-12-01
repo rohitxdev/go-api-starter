@@ -11,7 +11,7 @@ import (
 func mountRoutes(e *echo.Echo, h *Handler) {
 	limit := rateLimiter(!h.Config.IsDev)
 
-	e.Use(limit(256, time.Minute))
+	e.Pre(limit(100, time.Minute))
 	e.GET("/metrics", echoprometheus.NewHandler())
 	e.GET("/swagger/*", echoSwagger.EchoWrapHandler())
 	// @Summary Get config
