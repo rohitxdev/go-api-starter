@@ -57,7 +57,7 @@ func (kv *Store) cleanUp() {
 		select {
 		case <-kv.ticker.C:
 			if _, err := kv.db.Exec("DELETE FROM kv_store WHERE expires_at IS NOT NULL AND expires_at < CURRENT_TIMESTAMP;"); err != nil {
-				slog.Error("clean up kv store", slog.Any("error", err))
+				slog.Error("Clean up KV store", slog.Any("error", err))
 			}
 		case <-kv.ctx.Done():
 			return
