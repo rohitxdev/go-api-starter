@@ -97,8 +97,6 @@ build() {
         -ldflags='-s -w -X $PACKAGE_NAME/config.AppName=$APP_NAME -X $PACKAGE_NAME/config.AppVersion=$APP_VERSION -X $PACKAGE_NAME/config.BuildType=release -extldflags \"-static\"' \
         --trimpath -o $build_file_path ."
 
-    go mod tidy
-
     print loading "Verifying modules"
     if ! go mod verify &>/dev/null; then
         print error "Modules verification failed"
@@ -136,18 +134,18 @@ start() {
 
 test() {
     print loading "Running tests"
-    CONFIG_FILE=../../config.json go test --race --count=2 -v ./...
+    CONFIG_FILE=../config.json go test --race --count=2 -v ./...
 }
 
 test_cover() {
     print loading "Running tests and generating coverage report"
     [[ -d .tmp ]] || mkdir .tmp
-    CONFIG_FILE=../../config.json go test --race --coverprofile=./.tmp/coverage.out ./... && go tool cover --html=./.tmp/coverage.out
+    CONFIG_FILE=../config.json go test --race --coverprofile=./.tmp/coverage.out ./... && go tool cover --html=./.tmp/coverage.out
 }
 
 benchmark() {
     print loading "Running benchmarks"
-    CONFIG_FILE=../../config.json go test --race --count=2 -v --benchmem --bench=. ./...
+    CONFIG_FILE=../config.json go test --race --count=2 -v --benchmem --bench=. ./...
 }
 
 pprof() {
@@ -157,7 +155,7 @@ pprof() {
 }
 
 checkpoint() {
-    read -p "Create git checkpoint and push changes to origin?" -r && ! build && ! read -p "Still continue?" -r
+    read -p "Create git checkpoint and push changes to origin?" -r && go mod tidy && ! build && ! read -p "Still continue?" -r
     read -p "Commit message (optional): " -r msg
     git add --all
     if ! git commit -m "${msg:-"Checkpoint - $(date -u)"}" || ! git push; then

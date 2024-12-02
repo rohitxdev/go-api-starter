@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/lmittmann/tint"
 	"github.com/rohitxdev/go-api-starter/blobstore"
 	"github.com/rohitxdev/go-api-starter/config"
 	"github.com/rohitxdev/go-api-starter/cryptoutil"
@@ -18,7 +20,6 @@ import (
 	"github.com/rohitxdev/go-api-starter/email"
 	"github.com/rohitxdev/go-api-starter/handler"
 	"github.com/rohitxdev/go-api-starter/kvstore"
-	"github.com/rohitxdev/go-api-starter/logger"
 	"github.com/rohitxdev/go-api-starter/repo"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http2"
@@ -38,15 +39,32 @@ func Run() error {
 	}
 
 	// Set up logger.
-	logr := logger.New(os.Stderr, cfg.IsDev)
-
-	logr.Debug().
-		Str("appVersion", cfg.AppVersion).
-		Str("buildType", cfg.BuildType).
-		Str("env", cfg.Env).
-		Int("maxProcs", runtime.GOMAXPROCS(0)).
-		Str("platform", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)).
-		Msg("Running " + cfg.AppName)
+	logOpts := slog.HandlerOptions{
+		Level: slog.LevelDebug,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Value.Any() == nil || a.Value.String() == "" {
+				a.Key = ""
+			}
+			return a
+		},
+	}
+	var logHandler slog.Handler = slog.NewJSONHandler(os.Stderr, &logOpts)
+	if cfg.IsDev {
+		logHandler = tint.NewHandler(os.Stderr, &tint.Options{
+			Level:       logOpts.Level,
+			ReplaceAttr: logOpts.ReplaceAttr,
+			TimeFormat:  time.Kitchen,
+		})
+	}
+	slog.SetDefault(slog.New(logHandler))
+	slog.Debug("Running",
+		slog.String("appName", cfg.AppName),
+		slog.String("appVersion", cfg.AppVersion),
+		slog.String("buildType", cfg.BuildType),
+		slog.String("env", cfg.Env),
+		slog.Int("maxProcs", runtime.GOMAXPROCS(0)),
+		slog.String("platform", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)),
+	)
 
 	// Connect to KV store for caching.
 	kv, err := kvstore.New("kv", time.Minute*10)
@@ -88,7 +106,6 @@ func Run() error {
 		Config:    cfg,
 		Email:     e,
 		KVStore:   kv,
-		Logger:    logr,
 		Repo:      r,
 	}
 	defer s.Close()
@@ -105,10 +122,9 @@ func Run() error {
 	// Start HTTP server.
 	go func() {
 		if isDevTLS {
-			// nolint
-			certPath, keyPath, err := cryptoutil.GenerateSelfSignedCert()
-			if err != nil {
-				errCh <- fmt.Errorf("failed to generate self-signed certificate: %w", err)
+			certPath, keyPath, certErr := cryptoutil.GenerateSelfSignedCert()
+			if certErr != nil {
+				errCh <- fmt.Errorf("failed to generate self-signed certificate: %w", certErr)
 			}
 			errCh <- http.ListenAndServeTLS(address, certPath, keyPath, h)
 		} else {
@@ -122,7 +138,7 @@ func Run() error {
 	if isDevTLS {
 		proto = "https"
 	}
-	logr.Info().Msg(fmt.Sprintf("Server is listening on %s://%s", proto, address))
+	slog.Info(fmt.Sprintf("Server is listening on %s://%s", proto, address))
 
 	// Shut down HTTP server gracefully.
 	ctx := context.Background()
@@ -138,7 +154,7 @@ func Run() error {
 			return fmt.Errorf("failed to shutdown HTTP server: %w", err)
 		}
 
-		logr.Debug().Msg("HTTP server shut down gracefully")
+		slog.Debug("HTTP server shut down gracefully")
 	case err = <-errCh:
 		if err != nil && !errors.Is(err, net.ErrClosed) {
 			err = fmt.Errorf("failed to start HTTP server: %w", err)

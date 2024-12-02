@@ -17,7 +17,6 @@ import (
 	"github.com/rohitxdev/go-api-starter/email"
 	"github.com/rohitxdev/go-api-starter/handler"
 	"github.com/rohitxdev/go-api-starter/kvstore"
-	"github.com/rohitxdev/go-api-starter/logger"
 	"github.com/rohitxdev/go-api-starter/repo"
 	"github.com/stretchr/testify/assert"
 )
@@ -51,7 +50,11 @@ func createHttpRequest(opts *httpRequestOpts) (*http.Request, error) {
 	return req, err
 }
 
-func TestRootRoutes(t *testing.T) {
+func TestBaseRoutes(t *testing.T) {
+	t.Cleanup(func() {
+		os.RemoveAll(database.DirName)
+	})
+
 	//Load config
 	cfg, err := config.Load()
 	t.Log()
@@ -59,19 +62,15 @@ func TestRootRoutes(t *testing.T) {
 		panic("failed to load config: " + err.Error())
 	}
 
-	//Set up logger
-	logr := logger.New(os.Stderr, cfg.IsDev)
 	//Connect to postgres database
 	db, err := database.NewPostgreSQL(cfg.DatabaseURL)
 	if err != nil {
 		panic("failed to connect to database: " + err.Error())
 	}
-	logr.Debug().Msg("Connected to database")
 	defer func() {
 		if err = db.Close(); err != nil {
 			panic("failed to close database: " + err.Error())
 		}
-		logr.Debug().Msg("Database connection closed")
 	}()
 
 	//Connect to KV store
@@ -80,10 +79,8 @@ func TestRootRoutes(t *testing.T) {
 		panic("failed to connect to KV store: " + err.Error())
 	}
 
-	logr.Debug().Msg("Connected to KV store")
 	defer func() {
 		kv.Close()
-		logr.Debug().Msg("KV store closed")
 	}()
 
 	// Create repo
@@ -104,7 +101,6 @@ func TestRootRoutes(t *testing.T) {
 		BlobStore: bs,
 		Config:    cfg,
 		KVStore:   kv,
-		Logger:    logr,
 		Repo:      r,
 		Email:     e,
 	})

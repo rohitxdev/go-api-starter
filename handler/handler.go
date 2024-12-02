@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -23,7 +24,6 @@ import (
 	"github.com/rohitxdev/go-api-starter/email"
 	"github.com/rohitxdev/go-api-starter/kvstore"
 	"github.com/rohitxdev/go-api-starter/repo"
-	"github.com/rs/zerolog"
 )
 
 type Service struct {
@@ -31,7 +31,6 @@ type Service struct {
 	Config    *config.Config
 	Email     *email.Client
 	KVStore   *kvstore.Store
-	Logger    *zerolog.Logger
 	Repo      *repo.Repo
 }
 
@@ -120,11 +119,7 @@ func New(svc *Service) (*echo.Echo, error) {
 	e.HTTPErrorHandler = func(err error, c echo.Context) {
 		defer func() {
 			if err != nil {
-				h.Logger.Error().
-					Ctx(c.Request().Context()).
-					Err(err).
-					Str("id", c.Response().Header().Get(echo.HeaderXRequestID)).
-					Msg("HTTP error response failure")
+				slog.Error("HTTP error response failure", slog.String("id", c.Response().Header().Get(echo.HeaderXRequestID)), slog.String("error", err.Error()))
 			}
 		}()
 
@@ -187,39 +182,37 @@ func New(svc *Service) (*echo.Echo, error) {
 		LogError:        true,
 		LogHost:         true,
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			log := h.Logger.Info().
-				Ctx(c.Request().Context()).
-				Str("id", v.RequestID).
-				Str("clientIp", v.RemoteIP).
-				Str("protocol", v.Protocol).
-				Str("uri", v.URI).
-				Str("method", v.Method).
-				Int64("durationMs", v.Latency.Milliseconds()).
-				Int64("bytesOut", v.ResponseSize).
-				Int("status", v.Status).
-				Str("host", v.Host)
-
-			if v.UserAgent != "" {
-				log = log.Str("ua", v.UserAgent)
-			}
-			if v.Referer != "" {
-				log = log.Str("referer", v.Referer)
-			}
-			if user, ok := c.Get("user").(*repo.User); ok && (user != nil) {
-				log = log.Uint64("userId", user.ID)
-			}
-
-			if err, ok := v.Error.(*echo.HTTPError); ok {
-				if err.Code == http.StatusInternalServerError {
-					log = log.Err(err)
+			status := v.Status
+			var err error
+			if httpErr, ok := v.Error.(*echo.HTTPError); ok {
+				if httpErr.Code == http.StatusInternalServerError {
+					err = httpErr
 				}
 			} else if v.Error != nil {
 				// Due to a bug in echo, when the error is not an echo.HTTPError, even though the status code sent is 500, it's logged as 200 in this middleware. We need to manually set the status code in the log to 500.
-				log = log.Err(v.Error).Int("status", http.StatusInternalServerError)
+				status = http.StatusInternalServerError
 			}
 
-			log.Msg("HTTP request")
+			var userID uint64
+			if user, ok := c.Get("user").(*repo.User); ok && (user != nil) {
+				userID = user.ID
+			}
 
+			slog.Info("HTTP request",
+				slog.String("id", v.RequestID),
+				slog.String("clientIp", v.RemoteIP),
+				slog.String("protocol", v.Protocol),
+				slog.String("uri", v.URI),
+				slog.String("method", v.Method),
+				slog.Int64("durationMs", v.Latency.Milliseconds()),
+				slog.Int64("bytesOut", v.ResponseSize),
+				slog.String("host", v.Host),
+				slog.String("ua", v.UserAgent),
+				slog.String("referer", v.Referer),
+				slog.Uint64("userId", userID),
+				slog.Int("status", status),
+				slog.String("error", err.Error()),
+			)
 			return nil
 		},
 	}))
@@ -237,11 +230,7 @@ func New(svc *Service) (*echo.Echo, error) {
 
 	e.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
 		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
-			h.Logger.Error().Ctx(c.Request().Context()).
-				Err(err).
-				Str("stack", string(stack)).
-				Str("id", c.Response().Header().Get(echo.HeaderXRequestID)).
-				Msg("HTTP handler panic")
+			slog.Error("HTTP handler panic", slog.String("id", c.Response().Header().Get(echo.HeaderXRequestID)), slog.String("error", err.Error()), slog.String("stack", string(stack)))
 			return nil
 		}},
 	))
