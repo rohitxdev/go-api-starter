@@ -69,7 +69,7 @@ func (h Handler) checkAuth(c echo.Context, r role) (*repo.User, error) {
 	if err != nil {
 		return nil, echo.NewHTTPError(http.StatusUnauthorized, "User is not logged in")
 	}
-	userID, err := cryptoutil.VerifyJWT(accessTokenCookie.Value, h.Config.AccessTokenSecret)
+	userID, err := cryptoutil.VerifyJWT[uint64](accessTokenCookie.Value, h.Config.AccessTokenSecret)
 	if err != nil {
 		return nil, echo.NewHTTPError(http.StatusUnauthorized, "JWT verification failed")
 	}

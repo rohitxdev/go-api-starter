@@ -70,7 +70,7 @@ func Run() error {
 	)
 
 	// Connect to KV store for caching.
-	kv, err := kvstore.New("kv", time.Minute*10)
+	kv, err := kvstore.New(database.SQLiteDir()+"/kv.db", time.Minute*10)
 	if err != nil {
 		return fmt.Errorf("failed to connect to KV store: %w", err)
 	}

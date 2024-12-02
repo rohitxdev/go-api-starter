@@ -1,13 +1,15 @@
 package config
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/joho/godotenv"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -20,88 +22,91 @@ var (
 )
 
 type Config struct {
-	AppName    string `json:"appName"`
-	AppVersion string `json:"appVersion"`
-	BuildType  string `json:"buildType"`
-	Env        string `json:"env" validate:"required,oneof=development production"`
-	Host       string `json:"host" validate:"required,ip"`
-	Port       string `json:"port" validate:"required,gte=0"`
-	// DatabaseURL is the connection string of the database.
-	DatabaseURL  string `json:"databaseUrl" validate:"required"`
-	SMTPHost     string `json:"smtpHost" validate:"required"`
-	SMTPUsername string `json:"smtpUsername" validate:"required"`
-	SMTPPassword string `json:"smtpPassword" validate:"required"`
-	// SenderEmail is the email address from which emails will be sent.
-	SenderEmail        string         `json:"senderEmail" validate:"required"`
-	S3BucketName       string         `json:"s3BucketName"`
-	S3Endpoint         string         `json:"s3Endpoint"`
-	S3DefaultRegion    string         `json:"s3DefaultRegion"`
-	AWSAccessKeyID     string         `json:"awsAccessKeyId"`
-	AWSAccessKeySecret string         `json:"awsAccessKeySecret"`
-	GoogleOAuth2Config *oauth2.Config `json:"googleOAuth2Config"`
-	// GoogleClientID is the client ID for Google OAuth2 authentication.
-	GoogleClientID     string `json:"googleClientId"`
-	GoogleClientSecret string `json:"googleClientSecret"`
-	// AllowedOrigins is a list of origins that are allowed to access the API.
-	AccessTokenSecret     string        `json:"accessTokenSecret" validate:"required"`
-	RefreshTokenSecret    string        `json:"refreshTokenSecret" validate:"required"`
-	CommonTokenSecret     string        `json:"commonTokenSecret" validate:"required"`
-	AllowedOrigins        []string      `json:"allowedOrigins"`
-	AccessTokenExpiresIn  time.Duration `json:"accessTokenExpiresIn" validate:"required"`
-	RefreshTokenExpiresIn time.Duration `json:"refreshTokenExpiresIn" validate:"required"`
-	CommonTokenExpiresIn  time.Duration `json:"commonTokenExpiresIn" validate:"required"`
-	// SMTPPort is the port of the SMTP server.
-	SMTPPort int `json:"smtpPort" validate:"required"`
-	// IsDev is a flag indicating whether the server is running in development mode.
-	IsDev     bool `json:"isDev"`
-	UseDevTLS bool `json:"useDevTls"`
+	AppName               string
+	AppVersion            string
+	BuildType             string
+	Env                   string `validate:"required,oneof=development production"`
+	Host                  string `validate:"required,ip"`
+	Port                  string `validate:"required,gte=0"`
+	DatabaseURL           string `validate:"required"`
+	SMTPHost              string `validate:"required"`
+	SMTPUsername          string `validate:"required"`
+	SMTPPassword          string `validate:"required"`
+	SenderEmail           string `validate:"required"` // SenderEmail is the email address from which emails will be sent.
+	S3BucketName          string `validate:"required"`
+	S3Endpoint            string `validate:"required"`
+	S3DefaultRegion       string `validate:"required"`
+	AWSAccessKeyID        string `validate:"required"`
+	AWSAccessKeySecret    string `validate:"required"`
+	GoogleClientID        string // GoogleClientID is the client ID for Google OAuth2 authentication.
+	GoogleClientSecret    string
+	AccessTokenSecret     string `validate:"required"`
+	RefreshTokenSecret    string `validate:"required"`
+	CommonTokenSecret     string `validate:"required"`
+	GoogleOAuth2Config    *oauth2.Config
+	AllowedOrigins        []string
+	AccessTokenExpiresIn  time.Duration `validate:"required"`
+	RefreshTokenExpiresIn time.Duration `validate:"required"`
+	CommonTokenExpiresIn  time.Duration `validate:"required"`
+	SMTPPort              int           `validate:"required"`
+	IsDev                 bool
+	UseDevTLS             bool
 }
 
 func Load() (*Config, error) {
-	var m map[string]any
-	var err error
+	// Read from .env file if present.
+	env, _ := godotenv.Read(os.Getenv("ENV_FILE"))
 
-	if configFile := os.Getenv("CONFIG_FILE"); configFile != "" {
-		if m, err = loadFromFile(configFile); err != nil {
-			return nil, fmt.Errorf("failed to load secrets file: %w", err)
-		}
-	} else if configJSON := os.Getenv("CONFIG_JSON"); configJSON != "" {
-		if m, err = loadFromJSON(configJSON); err != nil {
-			return nil, fmt.Errorf("failed to load secrets JSON: %w", err)
-		}
-	} else {
-		return nil, errors.New("CONFIG_FILE or CONFIG_JSON must be set")
-	}
-
-	var errList []error
-
-	if m["shutdownTimeout"], err = time.ParseDuration(m["shutdownTimeout"].(string)); err != nil {
-		errList = append(errList, fmt.Errorf("failed to parse shutdown timeout: %w", err))
-	}
-	if m["accessTokenExpiresIn"], err = time.ParseDuration(m["accessTokenExpiresIn"].(string)); err != nil {
-		errList = append(errList, fmt.Errorf("failed to parse session duration: %w", err))
-	}
-	if m["refreshTokenExpiresIn"], err = time.ParseDuration(m["refreshTokenExpiresIn"].(string)); err != nil {
-		errList = append(errList, fmt.Errorf("failed to parse session duration: %w", err))
-	}
-	if m["commonTokenExpiresIn"], err = time.ParseDuration(m["commonTokenExpiresIn"].(string)); err != nil {
-		errList = append(errList, fmt.Errorf("failed to parse log in token expires in: %w", err))
-	}
-
-	if len(errList) > 0 {
-		return nil, errors.Join(errList...)
-	}
-
-	data, err := json.Marshal(m)
+	// Read from environment variables as fallback.
+	fallbackEnv, err := godotenv.Unmarshal(strings.Join(os.Environ(), "\n"))
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal config: %w", err)
+		return nil, fmt.Errorf("failed to read environment variables: %w", err)
+	}
+	for key, value := range fallbackEnv {
+		if _, ok := env[key]; !ok {
+			env[key] = value
+		}
 	}
 
 	var cfg Config
-	if err = json.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
-	}
+	var errList []error
 
+	cfg.AppName = AppName
+	cfg.AppVersion = AppVersion
+	cfg.BuildType = BuildType
+	cfg.Env = env["ENV"]
+	cfg.Host = env["HOST"]
+	cfg.Port = env["PORT"]
+	cfg.DatabaseURL = env["DATABASE_URL"]
+	cfg.SMTPHost = env["SMTP_HOST"]
+	cfg.SMTPUsername = env["SMTP_USERNAME"]
+	cfg.SMTPPassword = env["SMTP_PASSWORD"]
+	cfg.SenderEmail = env["SENDER_EMAIL"]
+	cfg.S3BucketName = env["S3_BUCKET_NAME"]
+	cfg.S3Endpoint = env["S3_ENDPOINT"]
+	cfg.S3DefaultRegion = env["S3_DEFAULT_REGION"]
+	cfg.AWSAccessKeyID = env["AWS_ACCESS_KEY_ID"]
+	cfg.AWSAccessKeySecret = env["AWS_ACCESS_KEY_SECRET"]
+	cfg.AccessTokenSecret = env["ACCESS_TOKEN_SECRET"]
+	cfg.RefreshTokenSecret = env["REFRESH_TOKEN_SECRET"]
+	cfg.CommonTokenSecret = env["COMMON_TOKEN_SECRET"]
+	cfg.AllowedOrigins = strings.Split(env["ALLOWED_ORIGINS"], ",")
+	if cfg.AccessTokenExpiresIn, err = time.ParseDuration(env["ACCESS_TOKEN_EXPIRES_IN"]); err != nil {
+		errList = append(errList, fmt.Errorf("failed to parse access token expires in: %w", err))
+	}
+	if cfg.RefreshTokenExpiresIn, err = time.ParseDuration(env["REFRESH_TOKEN_EXPIRES_IN"]); err != nil {
+		errList = append(errList, fmt.Errorf("failed to parse refresh token expires in: %w", err))
+	}
+	if cfg.CommonTokenExpiresIn, err = time.ParseDuration(env["COMMON_TOKEN_EXPIRES_IN"]); err != nil {
+		errList = append(errList, fmt.Errorf("failed to parse common token expires in: %w", err))
+	}
+	if cfg.SMTPPort, err = strconv.Atoi(env["SMTP_PORT"]); err != nil {
+		errList = append(errList, fmt.Errorf("failed to parse SMTP port: %w", err))
+	}
+	cfg.IsDev = env["ENV"] != "production"
+	cfg.UseDevTLS = env["USE_DEV_TLS"] == "true"
+	cfg.GoogleClientID = env["GOOGLE_CLIENT_ID"]
+	cfg.GoogleClientSecret = env["GOOGLE_CLIENT_SECRET"]
 	cfg.GoogleOAuth2Config = &oauth2.Config{
 		ClientID:     cfg.GoogleClientID,
 		ClientSecret: cfg.GoogleClientSecret,
@@ -109,34 +114,12 @@ func Load() (*Config, error) {
 		RedirectURL:  fmt.Sprintf("https://%s/v1/auth/oauth2/callback/google", cfg.Host+":"+cfg.Port),
 		Scopes:       []string{"openid email", "openid profile"},
 	}
-	cfg.AppName = AppName
-	cfg.AppVersion = AppVersion
-	cfg.BuildType = BuildType
-	cfg.IsDev = cfg.Env != "production"
 
 	if err = validator.New().Struct(cfg); err != nil {
-		return nil, fmt.Errorf("failed to validate config: %w", err)
+		errList = append(errList, fmt.Errorf("failed to validate config: %w", err))
 	}
+
+	err = errors.Join(errList...)
 
 	return &cfg, err
-}
-
-func loadFromFile(configFile string) (map[string]any, error) {
-	data, err := os.ReadFile(configFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read secrets file: %w", err)
-	}
-	var m map[string]any
-	if err = json.Unmarshal(data, &m); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal secrets file: %w", err)
-	}
-	return m, nil
-}
-
-func loadFromJSON(jsonData string) (map[string]any, error) {
-	var m map[string]any
-	if err := json.Unmarshal([]byte(jsonData), &m); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal secrets json: %w", err)
-	}
-	return m, nil
 }

@@ -24,8 +24,8 @@ type Store struct {
 	cancel context.CancelFunc
 }
 
-func New(dbName string, purgeFreq time.Duration) (*Store, error) {
-	db, err := database.NewSQLite(dbName)
+func New(dbPath string, purgeFreq time.Duration) (*Store, error) {
+	db, err := database.NewSQLite(dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kv store: %w", err)
 	}

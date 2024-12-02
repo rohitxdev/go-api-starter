@@ -13,47 +13,46 @@ import (
 
 func TestKVStore(t *testing.T) {
 	var kv *kvstore.Store
-	kvName := "test_kv"
 	ctx := context.Background()
-
+	dbPath := database.SQLiteDir() + "/test.db"
 	t.Run("Create KV store", func(t *testing.T) {
 		var err error
-		kv, err = kvstore.New(kvName, time.Second*5)
-		assert.Nil(t, err)
+		kv, err = kvstore.New(dbPath, time.Second*5)
+		assert.NoError(t, err)
 	})
 
 	assert.NotNil(t, kv)
 	defer func() {
 		kv.Close()
-		os.RemoveAll(database.DirName)
+		os.RemoveAll(dbPath)
 	}()
 
 	t.Run("Set key", func(t *testing.T) {
 		assert.Nil(t, kv.Set(ctx, "key", "value"))
 
 		value, err := kv.Get(ctx, "key")
-		assert.Equal(t, value, "value")
-		assert.Nil(t, err)
+		assert.Equal(t, "value", value)
+		assert.NoError(t, err)
 
-		assert.Equal(t, value, "value")
+		assert.Equal(t, "value", value)
 	})
 
 	t.Run("Get key", func(t *testing.T) {
 		value, err := kv.Get(ctx, "key")
-		assert.Nil(t, err)
-		assert.Equal(t, value, "value")
+		assert.NoError(t, err)
+		assert.Equal(t, "value", value)
 	})
 
 	t.Run("Delete key", func(t *testing.T) {
 		//Confirm key exists before deleting it
 		value, err := kv.Get(ctx, "key")
-		assert.NotEqual(t, value, "")
-		assert.NotEqual(t, err, kvstore.ErrKeyNotFound)
+		assert.Equal(t, value, "value")
+		assert.NotEqual(t, kvstore.ErrKeyNotFound, err)
 
 		assert.Nil(t, kv.Delete(ctx, "key"))
 
 		value, err = kv.Get(ctx, "key")
-		assert.Equal(t, value, "")
-		assert.Equal(t, err, kvstore.ErrKeyNotFound)
+		assert.Empty(t, value)
+		assert.Equal(t, kvstore.ErrKeyNotFound, err)
 	})
 }

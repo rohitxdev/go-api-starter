@@ -28,7 +28,7 @@ func (h *Handler) SignUp(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, Response{Message: "User already exists"})
 	}
 
-	passwordHash, err := cryptoutil.HashPassword(req.Password)
+	passwordHash, err := cryptoutil.HashSecure(req.Password)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
@@ -66,7 +66,7 @@ func (h *Handler) LogIn(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, Response{Message: "User not found"})
 	}
 
-	if !cryptoutil.VerifyPassword(req.Password, user.PasswordHash) {
+	if !cryptoutil.VerifyHashSecure(req.Password, user.PasswordHash) {
 		return c.JSON(http.StatusUnauthorized, Response{Message: "Incorrect password"})
 	}
 
@@ -99,7 +99,7 @@ func (h *Handler) GetAccessToken(c echo.Context) error {
 		}
 	}()
 
-	userID, err := cryptoutil.VerifyJWT(refreshToken.Value, h.Config.RefreshTokenSecret)
+	userID, err := cryptoutil.VerifyJWT[uint64](refreshToken.Value, h.Config.RefreshTokenSecret)
 	if err != nil {
 		return c.JSON(http.StatusUnauthorized, Response{Message: "Refresh token verification failed"})
 	}
@@ -131,7 +131,7 @@ func (h *Handler) UpdatePassword(c echo.Context) error {
 		return err
 	}
 
-	if !cryptoutil.VerifyPassword(req.CurrentPassword, user.PasswordHash) {
+	if !cryptoutil.VerifyHashSecure(req.CurrentPassword, user.PasswordHash) {
 		return c.JSON(http.StatusUnauthorized, Response{Message: "Incorrect password"})
 	}
 	if err := h.Repo.SetUserPassword(c.Request().Context(), user.ID, req.NewPassword); err != nil {
@@ -197,14 +197,14 @@ func (h *Handler) ResetPassword(c echo.Context) error {
 		return err
 	}
 
-	userID, err := cryptoutil.VerifyJWT(req.Token, h.Config.CommonTokenSecret)
+	userID, err := cryptoutil.VerifyJWT[uint64](req.Token, h.Config.CommonTokenSecret)
 	if err != nil {
 		return c.JSON(http.StatusUnauthorized, Response{Message: "JWT verification failed"})
 	}
 	if _, err = h.Repo.GetUserById(c.Request().Context(), userID); err != nil {
 		return c.JSON(http.StatusNotFound, Response{Message: "User not found"})
 	}
-	passwordHash, err := cryptoutil.HashPassword(req.NewPassword)
+	passwordHash, err := cryptoutil.HashSecure(req.NewPassword)
 	if err != nil {
 		return err
 	}
@@ -273,7 +273,7 @@ func (h *Handler) VerifyAccount(c echo.Context) error {
 		return err
 	}
 
-	userID, err := cryptoutil.VerifyJWT(req.Token, h.Config.CommonTokenSecret)
+	userID, err := cryptoutil.VerifyJWT[uint64](req.Token, h.Config.CommonTokenSecret)
 	if err != nil {
 		return c.JSON(http.StatusUnauthorized, Response{Message: "JWT verification failed"})
 	}

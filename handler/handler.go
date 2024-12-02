@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-playground/validator"
 	gojson "github.com/goccy/go-json"
+	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo-contrib/pprof"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -142,8 +143,9 @@ func New(svc *Service) (*echo.Echo, error) {
 	//Pre-router middlewares
 	if !h.Config.IsDev {
 		e.Pre(middleware.CSRF())
-		e.Pre(middleware.Secure())
 	}
+
+	e.Pre(middleware.Secure())
 
 	e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins:                             h.Config.AllowedOrigins,
@@ -154,13 +156,6 @@ func New(svc *Service) (*echo.Echo, error) {
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
 		Root:       "public",
 		Filesystem: http.FS(assets.FS),
-	}))
-
-	// This middleware causes data races. See https://github.com/labstack/echo/issues/1761. But it's not a big deal.
-	e.Pre(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
-		Timeout: 10 * time.Second, Skipper: func(c echo.Context) bool {
-			return strings.HasPrefix(c.Path(), "/debug/pprof")
-		},
 	}))
 
 	e.Pre(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
@@ -234,7 +229,14 @@ func New(svc *Service) (*echo.Echo, error) {
 		}},
 	))
 
-	// e.Use(echoprometheus.NewMiddleware("api"))
+	// This middleware causes data races, but it's not a big deal. See https://github.com/labstack/echo/issues/1761
+	e.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
+		Timeout: time.Second * 10, Skipper: func(c echo.Context) bool {
+			return strings.HasPrefix(c.Path(), "/debug/pprof")
+		},
+	}))
+
+	e.Use(echoprometheus.NewMiddleware("api"))
 
 	pprof.Register(e)
 

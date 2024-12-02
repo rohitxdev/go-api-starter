@@ -9,14 +9,13 @@ import (
 )
 
 func TestSqlite(t *testing.T) {
-	dbName := "test_db"
+	dbPath := database.SQLiteDir() + "/test.db"
 	t.Run("Create DB", func(t *testing.T) {
-		db, err := database.NewSQLite(dbName)
+		db, err := database.NewSQLite(dbPath)
 		assert.Nil(t, err)
-		defer db.Close()
-	})
-
-	t.Cleanup(func() {
-		os.RemoveAll(database.DirName)
+		defer func() {
+			db.Close()
+			os.RemoveAll(dbPath)
+		}()
 	})
 }

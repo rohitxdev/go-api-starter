@@ -13,11 +13,13 @@ import (
 	"encoding/base32"
 	"encoding/base64"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -112,7 +114,8 @@ func generateSalt(length int) ([]byte, error) {
 	return salt, nil
 }
 
-func HashPassword(password string) (string, error) {
+// Generates a secure hash of the provided text using Argon2 algorithm.
+func HashSecure(text string) (string, error) {
 	const (
 		time    = 1         // number of iterations
 		memory  = 64 * 1024 // memory in KiB
@@ -125,14 +128,15 @@ func HashPassword(password string) (string, error) {
 		return "", err
 	}
 
-	hash := argon2.IDKey([]byte(password), salt, time, memory, threads, keyLen)
+	hash := argon2.IDKey([]byte(text), salt, time, memory, threads, keyLen)
 	fullHash := append(salt, hash...)
 	encodedHash := base64.RawStdEncoding.EncodeToString(fullHash)
 
 	return encodedHash, nil
 }
 
-func VerifyPassword(password string, fullHash string) bool {
+// Verifies the provided hash against the provided text using Argon2 algorithm.
+func VerifyHashSecure(text string, fullHash string) bool {
 	data, err := base64.RawStdEncoding.DecodeString(fullHash)
 	if err != nil {
 		return false
@@ -140,40 +144,99 @@ func VerifyPassword(password string, fullHash string) bool {
 
 	salt := data[:16]
 	hash := data[16:]
-	newHash := argon2.IDKey([]byte(password), salt, 1, 64*1024, 4, 32)
+	newHash := argon2.IDKey([]byte(text), salt, 1, 64*1024, 4, 32)
 
 	return subtle.ConstantTimeCompare(hash, newHash) == 1
 }
 
-func GenerateJWT(userID uint64, expiresIn time.Duration, secret string) (string, error) {
+func GenerateJWT[T any](data T, expiresIn time.Duration, secret string) (string, error) {
+	t := time.Now()
 	claims := jwt.MapClaims{
-		"id":  userID,
-		"iat": time.Now().Unix(),
-		"exp": time.Now().Add(expiresIn).Unix(),
+		"data": data,
+		"iat":  t.Unix(),
+		"nbf":  t.Unix(),
+		"exp":  t.Add(expiresIn).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(secret))
+	tokenStr, err := token.SignedString([]byte(secret))
 	if err != nil {
 		return "", err
 	}
-	return tokenString, nil
+	return tokenStr, nil
 }
 
-// 'VerifyJWT' returns the user ID and error.
-func VerifyJWT(tokenString string, secret string) (uint64, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+// The type of claims may not be the same as the type given during the token creation. For example, non-float numbers get converted to float when parsed due to how JWT processes data. Be cautious and don't put non-primitive types in claims.
+func verifyJWTUnsafe[T any](tokenStr string, secret string) (T, error) {
+	var data T
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return []byte(secret), nil
 	})
 	if err != nil {
-		return 0, err
+		return data, err
 	}
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		return uint64(claims["id"].(float64)), nil
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		if err = claims.Valid(); err != nil {
+			return data, err
+		}
+		if data, ok = claims["data"].(T); ok {
+			return data, nil
+		}
+		return data, fmt.Errorf("expected data to have type %T, but got %T", data, claims["data"])
 	}
-	return 0, fmt.Errorf("invalid token")
+	return data, errors.New("invalid token")
+}
+
+func convertToType[T any](data any) (T, bool) {
+	var zero T
+	targetType := reflect.TypeOf(zero)
+
+	// Special handling for maps
+	if targetType.Kind() == reflect.Map {
+		dataValue := reflect.ValueOf(data)
+		if dataValue.Kind() == reflect.Map {
+			// Create a new map of the target type
+			newMap := reflect.MakeMap(targetType)
+
+			// Iterate through source map and convert each key-value pair
+			iter := dataValue.MapRange()
+			for iter.Next() {
+				k := iter.Key()
+				v := iter.Value()
+
+				// Ensure correct type conversion for keys and values
+				convertedK := k.Interface()
+				convertedV := v.Interface()
+
+				newMap.SetMapIndex(reflect.ValueOf(convertedK), reflect.ValueOf(convertedV))
+			}
+
+			return newMap.Interface().(T), true
+		}
+	}
+
+	// General type conversion
+	if reflect.TypeOf(data).ConvertibleTo(targetType) {
+		converted := reflect.ValueOf(data).Convert(targetType).Interface()
+		return converted.(T), true
+	}
+
+	return zero, false
+}
+
+// Works only for primitive types and maps.
+func VerifyJWT[T any](tokenStr string, secret string) (T, error) {
+	var zero T
+	anyData, err := verifyJWTUnsafe[any](tokenStr, secret)
+	if err != nil {
+		return zero, err
+	}
+	if data, ok := convertToType[T](anyData); ok {
+		return data, nil
+	}
+	return zero, fmt.Errorf("expected data to have type %T, but got %T", zero, anyData)
 }
 
 func checkCertValidity(filePath string) bool {
@@ -216,9 +279,12 @@ func checkKeyValidity(filePath string) bool {
 
 // GenerateSelfSignedCert returns certificate path, key path, isFromCache flag and error.
 func GenerateSelfSignedCert() (string, string, bool, error) {
-	rootPath := os.TempDir()
-	certPath := filepath.Join(rootPath, "localhost.crt")
-	keyPath := filepath.Join(rootPath, "localhost.key")
+	dir := ".local/tls"
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", "", false, err
+	}
+	certPath := filepath.Join(dir, "localhost.crt")
+	keyPath := filepath.Join(dir, "localhost.key")
 
 	if checkCertValidity(certPath) && checkKeyValidity(keyPath) {
 		return certPath, keyPath, true, nil

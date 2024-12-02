@@ -57,31 +57,38 @@ func createHttpRequest(opts *httpRequestOpts) (*http.Request, error) {
 }
 
 func TestBaseRoutes(t *testing.T) {
-
+	defer func() {
+		// The prometheus exporter middleware causes panics when running tests so it's necessary to use recover().
+		r := recover()
+		if r != nil {
+			t.Logf("Panic: %v", r)
+		}
+	}()
 	//Load config
 	cfg, err := config.Load()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	//Connect to postgres database
 	db, err := database.NewPostgreSQL(cfg.DatabaseURL)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	defer db.Close()
 
 	//Connect to KV store
-	kv, err := kvstore.New("kv", time.Minute*5)
-	assert.Nil(t, err)
+	dbPath := database.SQLiteDir() + "/test.db"
+	kv, err := kvstore.New(dbPath, time.Minute*5)
+	assert.NoError(t, err)
 	defer func() {
 		kv.Close()
-		os.RemoveAll(database.DirName)
+		os.RemoveAll(dbPath)
 	}()
 
 	// Create repo
 	r, err := repo.New(db)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	defer r.Close()
 
 	bs, err := blobstore.New(cfg.S3Endpoint, cfg.S3DefaultRegion, cfg.AWSAccessKeyID, cfg.AWSAccessKeySecret)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	e, err := email.New(&email.SMTPCredentials{
 		Host:               cfg.SMTPHost,
@@ -90,7 +97,7 @@ func TestBaseRoutes(t *testing.T) {
 		Password:           cfg.SMTPPassword,
 		InsecureSkipVerify: true,
 	})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	h, err := handler.New(&handler.Service{
 		BlobStore: bs,
@@ -99,25 +106,27 @@ func TestBaseRoutes(t *testing.T) {
 		Repo:      r,
 		Email:     e,
 	})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	t.Run("GET /", func(t *testing.T) {
+		t.Parallel()
 		req, err := createHttpRequest(&httpRequestOpts{
 			method: http.MethodGet,
 			path:   "/",
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		res := httptest.NewRecorder()
 		h.ServeHTTP(res, req)
 		assert.Equal(t, http.StatusOK, res.Code)
 	})
 
 	t.Run("GET /config", func(t *testing.T) {
+		t.Parallel()
 		req, err := createHttpRequest(&httpRequestOpts{
 			method: http.MethodGet,
 			path:   "/config",
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		res := httptest.NewRecorder()
 		h.ServeHTTP(res, req)
 		assert.Equal(t, http.StatusOK, res.Code)

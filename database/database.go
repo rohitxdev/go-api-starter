@@ -11,36 +11,24 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const (
-	DirName = ".sqlite"
-)
-
-func createDirIfNotExists(path string) error {
-	info, err := os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			if err = os.Mkdir(path, 0755); err != nil {
-				return fmt.Errorf("failed to create directory: %w", err)
-			}
-		} else {
-			return fmt.Errorf("failed to get stats of directory: %w", err)
-		}
-	} else if !info.IsDir() {
-		return fmt.Errorf("%s is not a directory", path)
+func SQLiteDir() string {
+	dir := ".local/sqlite"
+	if _, err := os.Stat("go.mod"); err != nil {
+		dir = "../" + dir
 	}
-	return nil
+	return dir
 }
 
-// 'dbName' is the name of the database file. Pass :memory: for in-memory database.
-func NewSQLite(dbName string) (*sql.DB, error) {
-	if dbName != ":memory:" {
-		if err := createDirIfNotExists(DirName); err != nil {
+// 'dbPath' is the name of the database file. Pass :memory: for in-memory database.
+func NewSQLite(dbPath string) (*sql.DB, error) {
+	dir := SQLiteDir()
+	if dbPath != ":memory:" {
+		if err := os.MkdirAll(dir, 0755); err != nil {
 			return nil, err
 		}
-		dbName = fmt.Sprintf("%s/%s.db", DirName, dbName)
 	}
 
-	db, err := sql.Open("sqlite", dbName)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open sqlite database: %w", err)
 	}

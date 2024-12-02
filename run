@@ -10,9 +10,12 @@ APP_NAME="$(basename "$PACKAGE_NAME")"
 APP_VERSION="$(git describe --tags --always --dirty)"
 GO_VERSION=$(awk '/^go/ { print $2 }' go.mod)
 BASE_IMAGE_TAG=":$GO_VERSION-alpine3.20"
-CONFIG_FILE=${CONFIG_FILE:-"config.json"}
+ENV_FILE=${ENV_FILE:-".local/.env"}
 
-# Disable exporting of all variables
+# shellcheck disable=SC1090
+[[ -r "$ENV_FILE" ]] && source "$ENV_FILE"
+
+# Disable exporting of variables after this point
 set +o allexport
 
 print() {
@@ -53,7 +56,7 @@ repo="$(echo "$PACKAGE_NAME" | cut -d '/' -f 2-)"
 readonly repo
 readonly tag="$APP_VERSION"
 readonly build_file_name="main"
-readonly build_file_path=".bin/$build_file_name"
+readonly build_file_path=".local/bin/$build_file_name"
 readonly image_name="$repo:$tag"
 
 docker_build() {
@@ -83,13 +86,13 @@ docker_push() {
 }
 
 watch() {
-    local tmp_dir=".tmp"
+    local tmp_dir=".local/tmp"
     local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/config.AppName=$APP_NAME -X $PACKAGE_NAME/config.AppVersion=$APP_VERSION -X $PACKAGE_NAME/config.BuildType=debug\" --race -o $tmp_dir/$build_file_name  ."
 
     print loading "Starting development server"
     # build.kill_delay is in nanoseconds
     air --tmp_dir="$tmp_dir" --build.cmd "$build_cmd" --build.bin "$tmp_dir/$build_file_name" --build.delay 0 --build.kill_delay 10000000000 \
-        --build.exclude_dir "" --build.include_ext "go,tmpl,json" --build.send_interrupt true --log.main_only true
+        --build.exclude_dir ".local" --build.send_interrupt true --log.main_only true
 }
 
 build() {
@@ -134,18 +137,18 @@ start() {
 
 test() {
     print loading "Running tests"
-    CONFIG_FILE=../config.json go test --race --count=2 -v ./...
+    go test --race --count=2 -v ./...
 }
 
 test_cover() {
     print loading "Running tests and generating coverage report"
     [[ -d .tmp ]] || mkdir .tmp
-    CONFIG_FILE=../config.json go test --race --coverprofile=./.tmp/coverage.out ./... && go tool cover --html=./.tmp/coverage.out
+    go test --race --coverprofile=./.tmp/coverage.out ./... && go tool cover --html=./.tmp/coverage.out
 }
 
 benchmark() {
     print loading "Running benchmarks"
-    CONFIG_FILE=../config.json go test --race --count=2 -v --benchmem --bench=. ./...
+    go test --race --count=2 -v --benchmem --bench=. ./...
 }
 
 pprof() {

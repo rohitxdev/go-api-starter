@@ -16,11 +16,11 @@ import (
 
 func TestBlobStore(t *testing.T) {
 	cfg, err := config.Load()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	ctx := context.Background()
 	store, err := blobstore.New(cfg.S3Endpoint, cfg.S3DefaultRegion, cfg.AWSAccessKeyID, cfg.AWSAccessKeySecret)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	fileName := "test.txt"
 	fileContent := []byte("lorem ipsum dorem")
@@ -35,9 +35,9 @@ func TestBlobStore(t *testing.T) {
 			ExpiresIn:   URLExpiresIn,
 		}
 		putURL, err := store.Put(ctx, &args)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		parsedURL, err := url.Parse(putURL)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		req := http.Request{
 			URL:    parsedURL,
@@ -48,7 +48,7 @@ func TestBlobStore(t *testing.T) {
 			},
 		}
 		res, err := http.DefaultClient.Do(&req)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		defer res.Body.Close()
 	})
 
@@ -59,14 +59,14 @@ func TestBlobStore(t *testing.T) {
 			ExpiresIn:  URLExpiresIn,
 		}
 		getURL, err := store.Get(ctx, &args)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		res, err := http.DefaultClient.Get(getURL)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		defer res.Body.Close()
 
 		resBody, err := io.ReadAll(res.Body)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, bytes.Equal(fileContent, resBody))
 
 	})
@@ -78,12 +78,12 @@ func TestBlobStore(t *testing.T) {
 			ExpiresIn:  URLExpiresIn,
 		}
 		deleteURL, err := store.Delete(ctx, &deleteArgs)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		parsedURL, err := url.Parse(deleteURL)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		res, err := http.DefaultClient.Do(&http.Request{Method: http.MethodDelete, URL: parsedURL})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		defer res.Body.Close()
 
 		getArgs := blobstore.GetParams{
@@ -92,10 +92,10 @@ func TestBlobStore(t *testing.T) {
 			ExpiresIn:  URLExpiresIn,
 		}
 		getURL, err := store.Get(ctx, &getArgs)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		res, err = http.DefaultClient.Get(getURL)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		defer res.Body.Close()
 		assert.Equal(t, http.StatusNotFound, res.StatusCode)
 	})
