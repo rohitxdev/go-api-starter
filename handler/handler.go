@@ -211,7 +211,7 @@ func New(svc *Service) (*echo.Echo, error) {
 				slog.String("referer", v.Referer),
 				slog.Uint64("userId", userID),
 				slog.Int("status", status),
-				slog.String("error", err.Error()),
+				slog.Any("error", err),
 			)
 			return nil
 		},
