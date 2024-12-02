@@ -43,7 +43,10 @@ func Run() error {
 		Level: slog.LevelDebug,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 			if a.Value.Any() == nil || a.Value.String() == "" {
-				a.Key = ""
+				return slog.Attr{}
+			}
+			if a.Key == "userId" && a.Value.Uint64() == 0 {
+				return slog.Attr{}
 			}
 			return a
 		},

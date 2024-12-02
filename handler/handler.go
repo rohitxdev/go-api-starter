@@ -183,10 +183,10 @@ func New(svc *Service) (*echo.Echo, error) {
 		LogHost:         true,
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
 			status := v.Status
-			var err error
+			var errStr string
 			if httpErr, ok := v.Error.(*echo.HTTPError); ok {
 				if httpErr.Code == http.StatusInternalServerError {
-					err = httpErr
+					errStr = httpErr.Error()
 				}
 			} else if v.Error != nil {
 				// Due to a bug in echo, when the error is not an echo.HTTPError, even though the status code sent is 500, it's logged as 200 in this middleware. We need to manually set the status code in the log to 500.
@@ -211,7 +211,7 @@ func New(svc *Service) (*echo.Echo, error) {
 				slog.String("referer", v.Referer),
 				slog.Uint64("userId", userID),
 				slog.Int("status", status),
-				slog.Any("error", err),
+				slog.String("error", errStr),
 			)
 			return nil
 		},
