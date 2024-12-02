@@ -125,9 +125,12 @@ func Run() error {
 	// Start HTTP server.
 	go func() {
 		if isDevTLS {
-			certPath, keyPath, certErr := cryptoutil.GenerateSelfSignedCert()
-			if certErr != nil {
-				errCh <- fmt.Errorf("failed to generate self-signed certificate: %w", certErr)
+			certPath, keyPath, isFromCache, cryptoErr := cryptoutil.GenerateSelfSignedCert()
+			if cryptoErr != nil {
+				errCh <- fmt.Errorf("failed to generate self-signed certificate: %w", cryptoErr)
+			}
+			if !isFromCache {
+				slog.Info("Generated self-signed TLS certificate and key")
 			}
 			errCh <- http.ListenAndServeTLS(address, certPath, keyPath, h)
 		} else {
@@ -137,11 +140,11 @@ func Run() error {
 		}
 	}()
 
-	proto := "http"
+	protocol := "http"
 	if isDevTLS {
-		proto = "https"
+		protocol = "https"
 	}
-	slog.Info(fmt.Sprintf("Server is listening on %s://%s", proto, address))
+	slog.Info(fmt.Sprintf("Server is listening on %s://%s", protocol, address))
 
 	// Shut down HTTP server gracefully.
 	ctx := context.Background()

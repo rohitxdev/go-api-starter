@@ -2,8 +2,6 @@ package kvstore_test
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"os"
 	"testing"
 	"time"
@@ -20,11 +18,15 @@ func TestKVStore(t *testing.T) {
 
 	t.Run("Create KV store", func(t *testing.T) {
 		var err error
-		kv, err = kvstore.New(kvName, time.Second*10)
+		kv, err = kvstore.New(kvName, time.Second*5)
 		assert.Nil(t, err)
 	})
 
 	assert.NotNil(t, kv)
+	defer func() {
+		kv.Close()
+		os.RemoveAll(database.DirName)
+	}()
 
 	t.Run("Set key", func(t *testing.T) {
 		assert.Nil(t, kv.Set(ctx, "key", "value"))
@@ -46,17 +48,12 @@ func TestKVStore(t *testing.T) {
 		//Confirm key exists before deleting it
 		value, err := kv.Get(ctx, "key")
 		assert.NotEqual(t, value, "")
-		assert.False(t, errors.Is(err, sql.ErrNoRows))
+		assert.NotEqual(t, err, kvstore.ErrKeyNotFound)
 
 		assert.Nil(t, kv.Delete(ctx, "key"))
 
 		value, err = kv.Get(ctx, "key")
 		assert.Equal(t, value, "")
-		assert.True(t, errors.Is(err, sql.ErrNoRows))
-	})
-
-	t.Cleanup(func() {
-		kv.Close()
-		os.RemoveAll(database.DirName)
+		assert.Equal(t, err, kvstore.ErrKeyNotFound)
 	})
 }

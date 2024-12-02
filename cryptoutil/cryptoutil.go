@@ -14,7 +14,6 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	"log/slog"
 	"math/big"
 	"net"
 	"os"
@@ -215,19 +214,20 @@ func checkKeyValidity(filePath string) bool {
 	return privateKey != nil
 }
 
-func GenerateSelfSignedCert() (string, string, error) {
+// GenerateSelfSignedCert returns certificate path, key path, isFromCache flag and error.
+func GenerateSelfSignedCert() (string, string, bool, error) {
 	rootPath := os.TempDir()
 	certPath := filepath.Join(rootPath, "localhost.crt")
 	keyPath := filepath.Join(rootPath, "localhost.key")
 
 	if checkCertValidity(certPath) && checkKeyValidity(keyPath) {
-		return certPath, keyPath, nil
+		return certPath, keyPath, true, nil
 	}
 
 	// Generate private key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return "", "", err
+		return "", "", false, err
 	}
 
 	// Certificate template
@@ -249,13 +249,13 @@ func GenerateSelfSignedCert() (string, string, error) {
 	// Create self-signed certificate
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
 	if err != nil {
-		return "", "", err
+		return "", "", false, err
 	}
 
 	// Write certificate to file
 	certFile, err := os.Create(certPath)
 	if err != nil {
-		return "", "", err
+		return "", "", false, err
 	}
 	defer certFile.Close()
 
@@ -264,13 +264,13 @@ func GenerateSelfSignedCert() (string, string, error) {
 		Bytes: derBytes,
 	}
 	if err = pem.Encode(certFile, &certBlock); err != nil {
-		return "", "", nil
+		return "", "", false, nil
 	}
 
 	// Write private key to file
 	keyFile, err := os.Create(keyPath)
 	if err != nil {
-		return "", "", err
+		return "", "", false, err
 	}
 	defer keyFile.Close()
 
@@ -279,10 +279,8 @@ func GenerateSelfSignedCert() (string, string, error) {
 		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
 	}
 	if err = pem.Encode(keyFile, &keyBock); err != nil {
-		return "", "", nil
+		return "", "", false, nil
 	}
 
-	slog.Info("Generated self-signed TLS certificate and key")
-
-	return certPath, keyPath, nil
+	return certPath, keyPath, false, nil
 }

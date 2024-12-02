@@ -12,7 +12,6 @@ import (
 
 	"github.com/go-playground/validator"
 	gojson "github.com/goccy/go-json"
-	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo-contrib/pprof"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -235,7 +234,7 @@ func New(svc *Service) (*echo.Echo, error) {
 		}},
 	))
 
-	e.Use(echoprometheus.NewMiddleware("api"))
+	// e.Use(echoprometheus.NewMiddleware("api"))
 
 	pprof.Register(e)
 

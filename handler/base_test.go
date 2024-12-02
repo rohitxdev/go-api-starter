@@ -3,6 +3,7 @@ package handler_test
 import (
 	"bytes"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -20,6 +21,11 @@ import (
 	"github.com/rohitxdev/go-api-starter/repo"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestMain(m *testing.M) {
+	slog.SetLogLoggerLevel(slog.LevelWarn)
+	os.Exit(m.Run())
+}
 
 type httpRequestOpts struct {
 	query   map[string]string
@@ -51,50 +57,39 @@ func createHttpRequest(opts *httpRequestOpts) (*http.Request, error) {
 }
 
 func TestBaseRoutes(t *testing.T) {
-	t.Cleanup(func() {
-		os.RemoveAll(database.DirName)
-	})
 
 	//Load config
 	cfg, err := config.Load()
-	t.Log()
-	if err != nil {
-		panic("failed to load config: " + err.Error())
-	}
+	assert.Nil(t, err)
 
 	//Connect to postgres database
 	db, err := database.NewPostgreSQL(cfg.DatabaseURL)
-	if err != nil {
-		panic("failed to connect to database: " + err.Error())
-	}
-	defer func() {
-		if err = db.Close(); err != nil {
-			panic("failed to close database: " + err.Error())
-		}
-	}()
+	assert.Nil(t, err)
+	defer db.Close()
 
 	//Connect to KV store
 	kv, err := kvstore.New("kv", time.Minute*5)
-	if err != nil {
-		panic("failed to connect to KV store: " + err.Error())
-	}
-
+	assert.Nil(t, err)
 	defer func() {
 		kv.Close()
+		os.RemoveAll(database.DirName)
 	}()
 
 	// Create repo
 	r, err := repo.New(db)
-	if err != nil {
-		panic("failed to create repo: " + err.Error())
-	}
+	assert.Nil(t, err)
 	defer r.Close()
 
 	bs, err := blobstore.New(cfg.S3Endpoint, cfg.S3DefaultRegion, cfg.AWSAccessKeyID, cfg.AWSAccessKeySecret)
-	if err != nil {
-		panic("failed to connect to S3 client: " + err.Error())
-	}
-	e, err := email.New(&email.SMTPCredentials{})
+	assert.Nil(t, err)
+
+	e, err := email.New(&email.SMTPCredentials{
+		Host:               cfg.SMTPHost,
+		Port:               cfg.SMTPPort,
+		Username:           cfg.SMTPUsername,
+		Password:           cfg.SMTPPassword,
+		InsecureSkipVerify: true,
+	})
 	assert.Nil(t, err)
 
 	h, err := handler.New(&handler.Service{
@@ -110,17 +105,6 @@ func TestBaseRoutes(t *testing.T) {
 		req, err := createHttpRequest(&httpRequestOpts{
 			method: http.MethodGet,
 			path:   "/",
-		})
-		assert.Nil(t, err)
-		res := httptest.NewRecorder()
-		h.ServeHTTP(res, req)
-		assert.Equal(t, http.StatusOK, res.Code)
-	})
-
-	t.Run("GET /ping", func(t *testing.T) {
-		req, err := createHttpRequest(&httpRequestOpts{
-			method: http.MethodGet,
-			path:   "/ping",
 		})
 		assert.Nil(t, err)
 		res := httptest.NewRecorder()

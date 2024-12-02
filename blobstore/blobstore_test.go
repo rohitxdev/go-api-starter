@@ -6,8 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"testing"
+	"time"
 
 	"github.com/rohitxdev/go-api-starter/blobstore"
 	"github.com/rohitxdev/go-api-starter/config"
@@ -22,58 +22,60 @@ func TestBlobStore(t *testing.T) {
 	store, err := blobstore.New(cfg.S3Endpoint, cfg.S3DefaultRegion, cfg.AWSAccessKeyID, cfg.AWSAccessKeySecret)
 	assert.Nil(t, err)
 
-	file, err := os.CreateTemp("", "test.txt")
-	assert.Nil(t, err)
-
-	defer func() {
-		file.Close()
-		os.Remove(file.Name())
-	}()
-
-	err = os.WriteFile(file.Name(), []byte("lorem ipsum dorem"), 0666)
-	assert.Nil(t, err)
-
-	testFileContent, err := io.ReadAll(file)
-	assert.Nil(t, err)
+	fileName := "test.txt"
+	fileContent := []byte("lorem ipsum dorem")
+	fileContentType := http.DetectContentType(fileContent)
+	URLExpiresIn := time.Second * 10
 
 	t.Run("Put file into bucket", func(t *testing.T) {
 		args := blobstore.PutParams{
 			BucketName:  cfg.S3BucketName,
-			FileName:    file.Name(),
-			ContentType: http.DetectContentType(testFileContent),
+			FileName:    fileName,
+			ContentType: fileContentType,
+			ExpiresIn:   URLExpiresIn,
 		}
-		url, err := store.Put(ctx, &args)
+		putURL, err := store.Put(ctx, &args)
+		assert.Nil(t, err)
+		parsedURL, err := url.Parse(putURL)
 		assert.Nil(t, err)
 
-		res, err := http.DefaultClient.Post(url, "application/octet-stream", bytes.NewReader(testFileContent))
+		req := http.Request{
+			URL:    parsedURL,
+			Method: http.MethodPut,
+			Body:   io.NopCloser(bytes.NewReader(fileContent)),
+			Header: http.Header{
+				"Content-Type": []string{fileContentType},
+			},
+		}
+		res, err := http.DefaultClient.Do(&req)
 		assert.Nil(t, err)
-
 		defer res.Body.Close()
 	})
 
 	t.Run("Get file from bucket", func(t *testing.T) {
 		args := blobstore.GetParams{
 			BucketName: cfg.S3BucketName,
-			FileName:   file.Name(),
+			FileName:   fileName,
+			ExpiresIn:  URLExpiresIn,
 		}
-		url, err := store.Get(ctx, &args)
+		getURL, err := store.Get(ctx, &args)
 		assert.Nil(t, err)
 
-		res, err := http.DefaultClient.Get(url)
+		res, err := http.DefaultClient.Get(getURL)
 		assert.Nil(t, err)
-
 		defer res.Body.Close()
 
-		fileContent, err := io.ReadAll(res.Body)
+		resBody, err := io.ReadAll(res.Body)
 		assert.Nil(t, err)
-		assert.True(t, bytes.Equal(testFileContent, fileContent))
+		assert.True(t, bytes.Equal(fileContent, resBody))
 
 	})
 
 	t.Run("Delete file from bucket", func(t *testing.T) {
 		deleteArgs := blobstore.DeleteParams{
 			BucketName: cfg.S3BucketName,
-			FileName:   file.Name(),
+			FileName:   fileName,
+			ExpiresIn:  URLExpiresIn,
 		}
 		deleteURL, err := store.Delete(ctx, &deleteArgs)
 		assert.Nil(t, err)
@@ -82,22 +84,20 @@ func TestBlobStore(t *testing.T) {
 
 		res, err := http.DefaultClient.Do(&http.Request{Method: http.MethodDelete, URL: parsedURL})
 		assert.Nil(t, err)
-
 		defer res.Body.Close()
 
 		getArgs := blobstore.GetParams{
 			BucketName: cfg.S3BucketName,
-			FileName:   file.Name(),
+			FileName:   fileName,
+			ExpiresIn:  URLExpiresIn,
 		}
 		getURL, err := store.Get(ctx, &getArgs)
 		assert.Nil(t, err)
 
 		res, err = http.DefaultClient.Get(getURL)
 		assert.Nil(t, err)
-
 		defer res.Body.Close()
 		assert.Equal(t, http.StatusNotFound, res.StatusCode)
-
 	})
 
 }

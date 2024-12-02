@@ -24,6 +24,7 @@ type Store struct {
 
 func New(endpoint string, region string, accessKeyId string, accessKeySecret string) (*Store, error) {
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
+		config.WithBaseEndpoint(endpoint),
 		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKeyId, accessKeySecret, "")),
 	)
@@ -32,7 +33,6 @@ func New(endpoint string, region string, accessKeyId string, accessKeySecret str
 	}
 
 	s3Client := s3.NewFromConfig(cfg)
-
 	client := Store{
 		client:        s3Client,
 		presignClient: s3.NewPresignClient(s3Client),
@@ -48,7 +48,7 @@ type PutParams struct {
 	ExpiresIn   time.Duration
 }
 
-// Put returns presigned URL to upload file to S3 bucket.
+// Put returns presigned URL to upload a file to S3 bucket.
 func (s *Store) Put(ctx context.Context, p *PutParams) (string, error) {
 	args := &s3.PutObjectInput{
 		Bucket:      &p.BucketName,
@@ -62,15 +62,13 @@ func (s *Store) Put(ctx context.Context, p *PutParams) (string, error) {
 	return req.URL, err
 }
 
-/*----------------------------------- Get File From Bucket ----------------------------------- */
-
 type GetParams struct {
 	BucketName string
 	FileName   string
 	ExpiresIn  time.Duration
 }
 
-// Get returns presigned URL to download file from S3 bucket.
+// Get returns presigned URL to download a file from S3 bucket.
 func (s *Store) Get(ctx context.Context, p *GetParams) (string, error) {
 	args := &s3.GetObjectInput{
 		Bucket: &p.BucketName,
@@ -83,15 +81,13 @@ func (s *Store) Get(ctx context.Context, p *GetParams) (string, error) {
 	return req.URL, err
 }
 
-/*----------------------------------- Delete File From Bucket ----------------------------------- */
-
 type DeleteParams struct {
 	BucketName string
 	FileName   string
 	ExpiresIn  time.Duration
 }
 
-// Delete returns presigned URL to delete file from S3 bucket.
+// Delete returns presigned URL to delete a file from S3 bucket.
 func (s *Store) Delete(ctx context.Context, p *DeleteParams) (string, error) {
 	args := &s3.DeleteObjectInput{
 		Bucket: &p.BucketName,
@@ -103,8 +99,6 @@ func (s *Store) Delete(ctx context.Context, p *DeleteParams) (string, error) {
 	}
 	return req.URL, err
 }
-
-/*----------------------------------- Get List Of Files ----------------------------------- */
 
 type FileMetaData struct {
 	LastModified time.Time `json:"lastModified"`
