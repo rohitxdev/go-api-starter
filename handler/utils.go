@@ -12,6 +12,20 @@ import (
 	"golang.org/x/time/rate"
 )
 
+var (
+	MsgUserNotLoggedIn         = "User is not logged in"
+	MsgUserNotFound            = "User not found"
+	MsgUserAlreadyExists       = "User already exists"
+	MsgAccountStatusNotActive  = "Account status is not ACTIVE"
+	MsgAccountStatusNotPending = "Account status is not PENDING"
+	MsgUnauthorizedCallbackURL = "Unauthorized callback URL"
+	MsgJWTVerificationFailed   = "JWT verification failed"
+	MsgIncorrectPassword       = "Incorrect password"
+	MsgInsufficientPrivileges  = "Insufficient privileges"
+	MsgTooManyRequests         = "Too many requests. Please try again later."
+	MsgSomethingWentWrong      = "Something went wrong"
+)
+
 type Response struct {
 	Message string `json:"message,omitempty"`
 	Success bool   `json:"success"`
@@ -21,6 +35,40 @@ type ResponseWithPayload[T any] struct {
 	Payload T      `json:"payload,omitempty"`
 	Message string `json:"message,omitempty"`
 	Success bool   `json:"success"`
+}
+
+type role string
+
+const (
+	RoleUser  role = repo.RoleUser
+	RoleAdmin role = repo.RoleAdmin
+)
+
+var roles = map[role]uint8{
+	RoleUser:  1,
+	RoleAdmin: 2,
+}
+
+func (h Handler) checkAuth(c echo.Context, r role) (*repo.User, error) {
+	accessTokenCookie, err := c.Cookie("accessToken")
+	if err != nil {
+		return nil, echo.NewHTTPError(http.StatusUnauthorized, MsgUserNotLoggedIn)
+	}
+	userID, err := cryptoutil.VerifyJWT[uint64](accessTokenCookie.Value, h.Config.AccessTokenSecret)
+	if err != nil {
+		return nil, echo.NewHTTPError(http.StatusUnauthorized, MsgJWTVerificationFailed)
+	}
+	user, err := h.Repo.GetUserById(c.Request().Context(), userID)
+	if err != nil {
+		return nil, echo.NewHTTPError(http.StatusNotFound, MsgUserNotFound)
+	}
+	if user.AccountStatus != repo.AccountStatusActive {
+		return nil, echo.NewHTTPError(http.StatusForbidden, MsgAccountStatusNotActive)
+	}
+	if roles[role(user.Role)] < roles[role(r)] {
+		return nil, echo.NewHTTPError(http.StatusForbidden, MsgInsufficientPrivileges)
+	}
+	return user, nil
 }
 
 // bindAndValidate binds path params, query params and the request body into provided type `i` and validates provided `i`. `i` must be a pointer. The default binder binds body based on Content-Type header. Validator must be registered using `Echo#Validator`.
@@ -50,40 +98,6 @@ func canonicalizeEmail(email string) string {
 	}
 	username = strings.ReplaceAll(username, ".", "")
 	return username + "@" + domain
-}
-
-type role string
-
-const (
-	RoleUser  role = repo.RoleUser
-	RoleAdmin role = repo.RoleAdmin
-)
-
-var roles = map[role]uint8{
-	RoleUser:  1,
-	RoleAdmin: 2,
-}
-
-func (h Handler) checkAuth(c echo.Context, r role) (*repo.User, error) {
-	accessTokenCookie, err := c.Cookie("accessToken")
-	if err != nil {
-		return nil, echo.NewHTTPError(http.StatusUnauthorized, "User is not logged in")
-	}
-	userID, err := cryptoutil.VerifyJWT[uint64](accessTokenCookie.Value, h.Config.AccessTokenSecret)
-	if err != nil {
-		return nil, echo.NewHTTPError(http.StatusUnauthorized, "JWT verification failed")
-	}
-	user, err := h.Repo.GetUserById(c.Request().Context(), userID)
-	if err != nil {
-		return nil, echo.NewHTTPError(http.StatusNotFound, "User not found")
-	}
-	if user.AccountStatus != repo.AccountStatusActive {
-		return nil, echo.NewHTTPError(http.StatusForbidden, "Account status is not ACTIVE")
-	}
-	if roles[role(user.Role)] < roles[role(r)] {
-		return nil, echo.NewHTTPError(http.StatusForbidden, "Insufficient privileges")
-	}
-	return user, nil
 }
 
 func setAccessTokenCookie(c echo.Context, expiresIn time.Duration, userID uint64, secret string) error {
@@ -158,7 +172,7 @@ func rateLimiter(isEnabled bool) func(reqs int, window time.Duration) echo.Middl
 		rc := middleware.DefaultRateLimiterConfig
 		rc.Store = store
 		rc.DenyHandler = func(c echo.Context, id string, err error) error {
-			return echo.NewHTTPError(http.StatusTooManyRequests, "Too many requests. Please try again later.")
+			return echo.NewHTTPError(http.StatusTooManyRequests, MsgTooManyRequests)
 		}
 		rc.ErrorHandler = func(c echo.Context, err error) error {
 			return err

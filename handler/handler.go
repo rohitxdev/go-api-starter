@@ -110,7 +110,7 @@ func New(svc *Service) (*echo.Echo, error) {
 
 	pageTemplates, err := template.ParseFS(assets.FS, "templates/pages/*.tmpl")
 	if err != nil {
-		return nil, fmt.Errorf("could not parse templates: %w", err)
+		return nil, fmt.Errorf("failed to parse templates: %w", err)
 	}
 	e.Renderer = renderer{
 		templates: pageTemplates,
@@ -135,7 +135,7 @@ func New(svc *Service) (*echo.Echo, error) {
 			}
 			err = c.JSON(httpErr.Code, res)
 		} else {
-			res.Message = "Something went wrong"
+			res.Message = MsgSomethingWentWrong
 			err = c.JSON(http.StatusInternalServerError, res)
 		}
 	}
