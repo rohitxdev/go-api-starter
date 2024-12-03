@@ -42,16 +42,16 @@ func NewSQLite(dbPath string) (*sql.DB, error) {
 		"PRAGMA foreign_keys = ON;",
 	}
 
-	var errList []error
+	var errs []error
 
 	for _, stmt := range stmts {
 		if _, err := db.Exec(stmt); err != nil {
-			errList = append(errList, err)
+			errs = append(errs, err)
 		}
 	}
 
-	if len(errList) > 0 {
-		return nil, errors.Join(errList...)
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
 	}
 
 	if err := db.Ping(); err != nil {

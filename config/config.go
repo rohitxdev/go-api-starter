@@ -54,22 +54,19 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	// Read from .env file if present.
-	env, _ := godotenv.Read(os.Getenv("ENV_FILE"))
-
-	// Read from environment variables as fallback.
-	fallbackEnv, err := godotenv.Unmarshal(strings.Join(os.Environ(), "\n"))
+	env, err := godotenv.Unmarshal(strings.Join(os.Environ(), "\n"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read environment variables: %w", err)
 	}
-	for key, value := range fallbackEnv {
-		if _, ok := env[key]; !ok {
+	// Read from .env file if present.
+	if fileEnv, readErr := godotenv.Read(env["ENV_FILE"]); readErr != nil {
+		for key, value := range fileEnv {
 			env[key] = value
 		}
 	}
 
 	var cfg Config
-	var errList []error
+	var errs []error
 
 	cfg.AppName = AppName
 	cfg.AppVersion = AppVersion
@@ -92,16 +89,16 @@ func Load() (*Config, error) {
 	cfg.CommonTokenSecret = env["COMMON_TOKEN_SECRET"]
 	cfg.AllowedOrigins = strings.Split(env["ALLOWED_ORIGINS"], ",")
 	if cfg.AccessTokenExpiresIn, err = time.ParseDuration(env["ACCESS_TOKEN_EXPIRES_IN"]); err != nil {
-		errList = append(errList, fmt.Errorf("failed to parse access token expires in: %w", err))
+		errs = append(errs, fmt.Errorf("failed to parse access token expires in: %w", err))
 	}
 	if cfg.RefreshTokenExpiresIn, err = time.ParseDuration(env["REFRESH_TOKEN_EXPIRES_IN"]); err != nil {
-		errList = append(errList, fmt.Errorf("failed to parse refresh token expires in: %w", err))
+		errs = append(errs, fmt.Errorf("failed to parse refresh token expires in: %w", err))
 	}
 	if cfg.CommonTokenExpiresIn, err = time.ParseDuration(env["COMMON_TOKEN_EXPIRES_IN"]); err != nil {
-		errList = append(errList, fmt.Errorf("failed to parse common token expires in: %w", err))
+		errs = append(errs, fmt.Errorf("failed to parse common token expires in: %w", err))
 	}
 	if cfg.SMTPPort, err = strconv.Atoi(env["SMTP_PORT"]); err != nil {
-		errList = append(errList, fmt.Errorf("failed to parse SMTP port: %w", err))
+		errs = append(errs, fmt.Errorf("failed to parse SMTP port: %w", err))
 	}
 	cfg.IsDev = env["ENV"] != "production"
 	cfg.UseDevTLS = env["USE_DEV_TLS"] == "true"
@@ -116,10 +113,10 @@ func Load() (*Config, error) {
 	}
 
 	if err = validator.New().Struct(cfg); err != nil {
-		errList = append(errList, fmt.Errorf("failed to validate config: %w", err))
+		errs = append(errs, fmt.Errorf("failed to validate config: %w", err))
 	}
 
-	err = errors.Join(errList...)
+	err = errors.Join(errs...)
 
 	return &cfg, err
 }
