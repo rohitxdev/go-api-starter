@@ -1,9 +1,8 @@
 <div>
     {{ template "header" . }}
-    <p>Hi, please click the link below to verify you account:</p>
+    <p>Hi, please click the link below to verify your account:</p>
     <p><a href="{{.callbackURL}}" style="font-weight: 600; text-decoration: underline; color: black;">Click here</a></p>
     <p>This link is valid for {{.validMinutes}} minutes.</p>
     <p>If you didn't request this, please ignore this email.</p>
-    <p>Best regards,<br>The Team</p>
     {{ template "footer" . }}
 </div>

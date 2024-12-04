@@ -12,6 +12,14 @@ import (
 	"github.com/rohitxdev/go-api-starter/repo"
 )
 
+// @Summary Sign up
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param email formData string true "Email"
+// @Param password formData string true "Password"
+// @Success 200 {object} Response
+// @Router /auth/sign-up [post]
 func (h *Handler) SignUp(c echo.Context) error {
 	var req struct {
 		Email    string `form:"email" json:"email" validate:"required,email"`
@@ -51,6 +59,14 @@ func (h *Handler) SignUp(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Message: "Signed up successfully", Success: true})
 }
 
+// @Summary Log in
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param email formData string true "Email"
+// @Param password formData string true "Password"
+// @Success 200 {object} Response
+// @Router /auth/log-in [post]
 func (h *Handler) LogIn(c echo.Context) error {
 	var req struct {
 		Email    string `form:"email" json:"email" validate:"required,email"`
@@ -82,6 +98,12 @@ func (h *Handler) LogIn(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Message: "Logged in successfully", Success: true})
 }
 
+// @Summary Log out
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response
+// @Router /auth/log-out [get]
 func (h *Handler) LogOut(c echo.Context) error {
 	_, err := c.Cookie("refreshToken")
 	if err != nil {
@@ -91,6 +113,12 @@ func (h *Handler) LogOut(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Message: "Logged out successfully", Success: true})
 }
 
+// @Summary Get access token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response
+// @Router /auth/access-token [get]
 func (h *Handler) AccessToken(c echo.Context) error {
 	refreshToken, err := c.Cookie("refreshToken")
 	if err != nil {
@@ -122,6 +150,14 @@ func (h *Handler) AccessToken(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Message: "Generated access token successfully", Success: true})
 }
 
+// @Summary Update password
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param currentPassword formData string true "Current password"
+// @Param newPassword formData string true "New password"
+// @Success 200 {object} Response
+// @Router /auth/password [put]
 func (h *Handler) UpdatePassword(c echo.Context) error {
 	user, err := h.checkAuth(c, RoleUser)
 	if err != nil {
@@ -144,6 +180,14 @@ func (h *Handler) UpdatePassword(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Message: "Password updated successfully", Success: true})
 }
 
+// @Summary Send reset password email
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param email formData string true "Email"
+// @Param callbackUrl formData string true "Callback URL"
+// @Success 200 {object} Response
+// @Router /auth/password/reset [post]
 func (h *Handler) SendResetPasswordEmail(c echo.Context) error {
 	var req struct {
 		Email       string `form:"email" json:"email" validate:"required,email"`
@@ -192,6 +236,14 @@ func (h *Handler) SendResetPasswordEmail(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Message: "Sent password reset email successfully", Success: true})
 }
 
+// @Summary Reset password
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param token formData string true "Token"
+// @Param newPassword formData string true "New password"
+// @Success 200 {object} Response
+// @Router /auth/password/reset [put]
 func (h *Handler) ResetPassword(c echo.Context) error {
 	var req struct {
 		Token       string `form:"token" json:"token" validate:"required"`
@@ -218,6 +270,14 @@ func (h *Handler) ResetPassword(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Message: "Password updated successfully", Success: true})
 }
 
+// @Summary Send account verification email
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param email formData string true "Email"
+// @Param callbackUrl formData string true "Callback URL"
+// @Success 200 {object} Response
+// @Router /auth/verify/email [post]
 func (h *Handler) SendAccountVerificationEmail(c echo.Context) error {
 	var req struct {
 		Email       string `form:"email" json:"email" validate:"required,email"`
@@ -269,7 +329,14 @@ func (h *Handler) SendAccountVerificationEmail(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Message: "Sent verification email successfully", Success: true})
 }
 
-func (h *Handler) VerifyAccount(c echo.Context) error {
+// @Summary Verify email
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param token formData string true "Token"
+// @Success 200 {object} Response
+// @Router /auth/verify/email [put]
+func (h *Handler) VerifyEmail(c echo.Context) error {
 	var req struct {
 		Token string `form:"token" json:"token" validate:"required"`
 	}
@@ -291,9 +358,15 @@ func (h *Handler) VerifyAccount(c echo.Context) error {
 	if err = h.Repo.SetAccountStatusActive(c.Request().Context(), user.ID); err != nil {
 		return fmt.Errorf("failed to set account status to active: %w", err)
 	}
-	return c.JSON(http.StatusOK, Response{Message: "Account verified successfully", Success: true})
+	return c.JSON(http.StatusOK, Response{Message: "Email verified successfully", Success: true})
 }
 
+// @Summary Delete user
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response
+// @Router /auth/user [delete]
 func (h *Handler) DeleteUser(c echo.Context) error {
 	user, err := h.checkAuth(c, RoleUser)
 	if err != nil {
@@ -302,9 +375,16 @@ func (h *Handler) DeleteUser(c echo.Context) error {
 	if err = h.Repo.DeleteUser(c.Request().Context(), user.ID); err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
-	return c.JSON(http.StatusOK, Response{Message: "Account deleted successfully", Success: true})
+	return c.JSON(http.StatusOK, Response{Message: "User deleted successfully", Success: true})
 }
 
+// @Summary Get current user
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {object} ResponseWithPayload[repo.PublicUser]
+// @Router /auth/user [get]
 func (h *Handler) User(c echo.Context) error {
 	user, err := h.checkAuth(c, RoleUser)
 	if err != nil {

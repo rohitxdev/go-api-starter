@@ -5,7 +5,6 @@ import (
 	"html/template"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -20,7 +19,6 @@ import (
 	"github.com/rohitxdev/go-api-starter/assets"
 	"github.com/rohitxdev/go-api-starter/blobstore"
 	"github.com/rohitxdev/go-api-starter/config"
-	"github.com/rohitxdev/go-api-starter/docs"
 	"github.com/rohitxdev/go-api-starter/email"
 	"github.com/rohitxdev/go-api-starter/repo"
 )
@@ -86,8 +84,6 @@ func (s jsonSerializer) Deserialize(c echo.Context, v any) error {
 
 func New(svc *Service) (*echo.Echo, error) {
 	h := Handler{Service: svc}
-
-	docs.SwaggerInfo.Host = net.JoinHostPort(h.Config.Host, h.Config.Port)
 
 	e := echo.New()
 
