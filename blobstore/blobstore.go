@@ -23,7 +23,7 @@ type Store struct {
 }
 
 func New(endpoint string, region string, accessKeyId string, accessKeySecret string) (*Store, error) {
-	cfg, err := config.LoadDefaultConfig(context.TODO(),
+	cfg, err := config.LoadDefaultConfig(context.Background(),
 		config.WithBaseEndpoint(endpoint),
 		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKeyId, accessKeySecret, "")),

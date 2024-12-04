@@ -134,7 +134,6 @@ func (h *Handler) AccessToken(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, MsgJWTVerificationFailed)
 	}
-	// TODO: Check if refresh token is in cache. If not, return unauthorized.
 
 	user, err := h.Repo.GetUserById(c.Request().Context(), userID)
 	if err != nil {
