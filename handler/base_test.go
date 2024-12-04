@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/rohitxdev/go-api-starter/blobstore"
@@ -17,7 +16,6 @@ import (
 	"github.com/rohitxdev/go-api-starter/database"
 	"github.com/rohitxdev/go-api-starter/email"
 	"github.com/rohitxdev/go-api-starter/handler"
-	"github.com/rohitxdev/go-api-starter/kvstore"
 	"github.com/rohitxdev/go-api-starter/repo"
 	"github.com/stretchr/testify/assert"
 )
@@ -73,15 +71,6 @@ func TestBaseRoutes(t *testing.T) {
 	assert.NoError(t, err)
 	defer db.Close()
 
-	//Connect to KV store
-	dbPath := database.SQLiteDir() + "/test.db"
-	kv, err := kvstore.New(dbPath, time.Minute*5)
-	assert.NoError(t, err)
-	defer func() {
-		kv.Close()
-		os.RemoveAll(dbPath)
-	}()
-
 	// Create repo
 	r, err := repo.New(db)
 	assert.NoError(t, err)
@@ -95,14 +84,13 @@ func TestBaseRoutes(t *testing.T) {
 		Port:               cfg.SMTPPort,
 		Username:           cfg.SMTPUsername,
 		Password:           cfg.SMTPPassword,
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: cfg.IsDev,
 	})
 	assert.NoError(t, err)
 
 	h, err := handler.New(&handler.Service{
 		BlobStore: bs,
 		Config:    cfg,
-		KVStore:   kv,
 		Repo:      r,
 		Email:     e,
 	})

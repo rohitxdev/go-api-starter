@@ -22,7 +22,6 @@ import (
 	"github.com/rohitxdev/go-api-starter/config"
 	"github.com/rohitxdev/go-api-starter/docs"
 	"github.com/rohitxdev/go-api-starter/email"
-	"github.com/rohitxdev/go-api-starter/kvstore"
 	"github.com/rohitxdev/go-api-starter/repo"
 )
 
@@ -30,14 +29,10 @@ type Service struct {
 	BlobStore *blobstore.Store
 	Config    *config.Config
 	Email     *email.Client
-	KVStore   *kvstore.Store
 	Repo      *repo.Repo
 }
 
 func (s *Service) Close() error {
-	if err := s.KVStore.Close(); err != nil {
-		return fmt.Errorf("failed to close KV store: %w", err)
-	}
 	if err := s.Repo.Close(); err != nil {
 		return fmt.Errorf("failed to close repo: %w", err)
 	}

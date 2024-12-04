@@ -6,24 +6,18 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "modernc.org/sqlite"
 )
 
-func SQLiteDir() string {
-	dir := ".local/sqlite"
-	if _, err := os.Stat("go.mod"); err != nil {
-		dir = "../" + dir
-	}
-	return dir
-}
+const SQLiteDir = ".local/sqlite"
 
 // 'dbPath' is the name of the database file. Pass :memory: for in-memory database.
 func NewSQLite(dbPath string) (*sql.DB, error) {
-	dir := SQLiteDir()
 	if dbPath != ":memory:" {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
 			return nil, err
 		}
 	}

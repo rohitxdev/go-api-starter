@@ -12,12 +12,12 @@ import (
 	"golang.org/x/time/rate"
 )
 
-var (
+const (
 	MsgUserNotLoggedIn         = "User is not logged in"
 	MsgUserNotFound            = "User not found"
 	MsgUserAlreadyExists       = "User already exists"
-	MsgAccountStatusNotActive  = "Account status is not ACTIVE"
-	MsgAccountStatusNotPending = "Account status is not PENDING"
+	MsgAccountStatusNotActive  = "Account status is not " + repo.AccountStatusActive
+	MsgAccountStatusNotPending = "Account status is not " + repo.AccountStatusPending
 	MsgUnauthorizedCallbackURL = "Unauthorized callback URL"
 	MsgJWTVerificationFailed   = "JWT verification failed"
 	MsgIncorrectPassword       = "Incorrect password"

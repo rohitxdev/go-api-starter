@@ -14,14 +14,14 @@ func mountRoutes(e *echo.Echo, h *Handler) {
 	e.Pre(limit(100, time.Minute))
 	e.GET("/metrics", echoprometheus.NewHandler())
 	e.GET("/swagger/*", echoSwagger.EchoWrapHandler())
-	// @Summary Get config
+	// @Summary Get client config
 	// @Success 200 {object} ResponseWithPayload[ClientConfig]
 	// @Router /config [get]
-	e.GET("/config", h.GetConfig)
+	e.GET("/config", h.ClientConfig)
 	// @Summary Home Page
 	// @Success 200 {html} string "home page"
 	// @Router / [get]
-	e.GET("/", h.GetHome)
+	e.GET("/", h.Home)
 
 	auth := e.Group("/auth")
 	{
@@ -56,7 +56,7 @@ func mountRoutes(e *echo.Echo, h *Handler) {
 		// @Produce json
 		// @Success 200 {object} response
 		// @Router /auth/access-token [get]
-		auth.GET("/access-token", h.GetAccessToken, limit(2, h.Config.AccessTokenExpiresIn))
+		auth.GET("/access-token", h.AccessToken, limit(2, h.Config.AccessTokenExpiresIn))
 		user := auth.Group("/user")
 		{
 			// @Summary Get current user
@@ -66,7 +66,7 @@ func mountRoutes(e *echo.Echo, h *Handler) {
 			// @Security ApiKeyAuth
 			// @Success 200 {object} ResponseWithPayload[repo.PublicUser]
 			// @Router /auth/user [get]
-			user.GET("", h.GetCurrentUser)
+			user.GET("", h.CurrentUser)
 			// @Summary Update password
 			// @Tags Auth
 			// @Accept json

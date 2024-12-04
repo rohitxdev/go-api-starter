@@ -65,6 +65,9 @@ func (h *Handler) LogIn(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, MsgUserNotFound)
 	}
+	if user.AccountStatus != repo.AccountStatusActive {
+		return echo.NewHTTPError(http.StatusForbidden, MsgAccountStatusNotActive)
+	}
 
 	if !cryptoutil.VerifyHashSecure(req.Password, user.PasswordHash) {
 		return echo.NewHTTPError(http.StatusUnauthorized, MsgIncorrectPassword)
@@ -88,7 +91,7 @@ func (h *Handler) LogOut(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Message: "Logged out successfully", Success: true})
 }
 
-func (h *Handler) GetAccessToken(c echo.Context) error {
+func (h *Handler) AccessToken(c echo.Context) error {
 	refreshToken, err := c.Cookie("refreshToken")
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, MsgUserNotLoggedIn)
@@ -103,6 +106,7 @@ func (h *Handler) GetAccessToken(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, MsgJWTVerificationFailed)
 	}
+	// TODO: Check if refresh token is in cache. If not, return unauthorized.
 
 	user, err := h.Repo.GetUserById(c.Request().Context(), userID)
 	if err != nil {
@@ -290,7 +294,7 @@ func (h *Handler) VerifyAccount(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Message: "Account verified successfully", Success: true})
 }
 
-func (h *Handler) GetCurrentUser(c echo.Context) error {
+func (h *Handler) CurrentUser(c echo.Context) error {
 	user, err := h.checkAuth(c, RoleUser)
 	if err != nil {
 		return err

@@ -19,7 +19,6 @@ import (
 	"github.com/rohitxdev/go-api-starter/database"
 	"github.com/rohitxdev/go-api-starter/email"
 	"github.com/rohitxdev/go-api-starter/handler"
-	"github.com/rohitxdev/go-api-starter/kvstore"
 	"github.com/rohitxdev/go-api-starter/repo"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http2"
@@ -69,12 +68,6 @@ func Run() error {
 		slog.String("platform", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)),
 	)
 
-	// Connect to KV store for caching.
-	kv, err := kvstore.New(database.SQLiteDir()+"/kv.db", time.Minute*10)
-	if err != nil {
-		return fmt.Errorf("failed to connect to KV store: %w", err)
-	}
-
 	// Connect to postgres database.
 	db, err := database.NewPostgreSQL(cfg.DatabaseURL)
 	if err != nil {
@@ -98,7 +91,7 @@ func Run() error {
 		Port:               cfg.SMTPPort,
 		Username:           cfg.SMTPUsername,
 		Password:           cfg.SMTPPassword,
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: cfg.IsDev,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create email client: %w", err)
@@ -108,7 +101,6 @@ func Run() error {
 		BlobStore: bs,
 		Config:    cfg,
 		Email:     e,
-		KVStore:   kv,
 		Repo:      r,
 	}
 	defer s.Close()

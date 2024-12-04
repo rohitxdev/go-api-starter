@@ -110,3 +110,13 @@ func (r *Repo) SetUserPassword(ctx context.Context, id uint64, passwordHash stri
 	_, err := r.db.ExecContext(ctx, `UPDATE auth.users SET password_hash=$1 WHERE id=$2;`, passwordHash, id)
 	return err
 }
+
+func (r *Repo) DeleteUser(ctx context.Context, id uint64) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE auth.users SET account_status=$1 WHERE id=$2;`, AccountStatusDeleted, id)
+	return err
+}
+
+func (r *Repo) HardDeleteUser(ctx context.Context, id uint64) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM auth.users WHERE id=$1`, id)
+	return err
+}
