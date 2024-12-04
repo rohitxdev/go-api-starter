@@ -294,7 +294,18 @@ func (h *Handler) VerifyAccount(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Message: "Account verified successfully", Success: true})
 }
 
-func (h *Handler) CurrentUser(c echo.Context) error {
+func (h *Handler) DeleteUser(c echo.Context) error {
+	user, err := h.checkAuth(c, RoleUser)
+	if err != nil {
+		return err
+	}
+	if err = h.Repo.DeleteUser(c.Request().Context(), user.ID); err != nil {
+		return fmt.Errorf("failed to delete user: %w", err)
+	}
+	return c.JSON(http.StatusOK, Response{Message: "Account deleted successfully", Success: true})
+}
+
+func (h *Handler) User(c echo.Context) error {
 	user, err := h.checkAuth(c, RoleUser)
 	if err != nil {
 		return err

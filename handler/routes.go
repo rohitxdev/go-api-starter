@@ -66,7 +66,14 @@ func mountRoutes(e *echo.Echo, h *Handler) {
 			// @Security ApiKeyAuth
 			// @Success 200 {object} ResponseWithPayload[repo.PublicUser]
 			// @Router /auth/user [get]
-			user.GET("", h.CurrentUser)
+			user.GET("", h.User)
+			// @Summary Delete account
+			// @Tags Auth
+			// @Accept json
+			// @Produce json
+			// @Success 200 {object} Response
+			// @Router /auth/user [delete]
+			auth.DELETE("", h.DeleteUser)
 			// @Summary Update password
 			// @Tags Auth
 			// @Accept json
