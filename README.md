@@ -26,6 +26,6 @@ Run the production server:
 
 ## Notes
 
-- The `run` script is used to automate common development/production tasks. Run `./run` to see the available tasks.
+- The `run` file is the project's task runner script. Run `./run` to see the available commands.
 - The config & secrets should be stored in the `.env` file in the `.local` directory. If you want to use a different file, you can specify it using the `ENV_FILE` environment variable.
 - If build fails due to an error in parsing 'default.pgo', you can delete the file and run build again.

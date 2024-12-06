@@ -29,7 +29,7 @@ func New(endpoint string, region string, accessKeyId string, accessKeySecret str
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKeyId, accessKeySecret, "")),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not load default config of S3 client: %w", err)
+		return nil, fmt.Errorf("could not load default config of s3 client: %w", err)
 	}
 
 	s3Client := s3.NewFromConfig(cfg)

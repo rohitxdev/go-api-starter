@@ -183,7 +183,7 @@ func New(svc *Service) (*echo.Echo, error) {
 				userID = user.ID
 			}
 
-			slog.Info("HTTP request",
+			slog.Info("http request",
 				slog.String("id", v.RequestID),
 				slog.String("clientIp", v.RemoteIP),
 				slog.String("protocol", v.Protocol),
@@ -215,7 +215,7 @@ func New(svc *Service) (*echo.Echo, error) {
 
 	e.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
 		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
-			slog.Error("HTTP handler panic", slog.String("id", c.Response().Header().Get(echo.HeaderXRequestID)), slog.String("error", err.Error()), slog.String("stack", string(stack)))
+			slog.Error("http handler panic", slog.String("id", c.Response().Header().Get(echo.HeaderXRequestID)), slog.String("error", err.Error()), slog.String("stack", string(stack)))
 			return nil
 		}},
 	))

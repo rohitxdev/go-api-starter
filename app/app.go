@@ -59,7 +59,7 @@ func Run() error {
 		})
 	}
 	slog.SetDefault(slog.New(logHandler))
-	slog.Debug("Running",
+	slog.Debug("running",
 		slog.String("appName", cfg.AppName),
 		slog.String("appVersion", cfg.AppVersion),
 		slog.String("buildType", cfg.BuildType),
@@ -83,7 +83,7 @@ func Run() error {
 	// Create blobstore for storing files.
 	bs, err := blobstore.New(cfg.S3Endpoint, cfg.S3DefaultRegion, cfg.AWSAccessKeyID, cfg.AWSAccessKeySecret)
 	if err != nil {
-		return fmt.Errorf("failed to connect to S3 client: %w", err)
+		return fmt.Errorf("failed to create s3 client: %w", err)
 	}
 
 	e, err := email.New(&email.SMTPCredentials{
@@ -107,7 +107,7 @@ func Run() error {
 
 	h, err := handler.New(&s)
 	if err != nil {
-		return fmt.Errorf("failed to create HTTP handler: %w", err)
+		return fmt.Errorf("failed to create http handler: %w", err)
 	}
 
 	errCh := make(chan error)
@@ -122,7 +122,7 @@ func Run() error {
 				errCh <- fmt.Errorf("failed to generate self-signed certificate: %w", cryptoErr)
 			}
 			if !isFromCache {
-				slog.Info("Generated self-signed TLS certificate and key")
+				slog.Info("generated self-signed tls certificate and key")
 			}
 			errCh <- http.ListenAndServeTLS(address, certPath, keyPath, h)
 		} else {
@@ -136,7 +136,7 @@ func Run() error {
 	if isDevTLS {
 		protocol = "https"
 	}
-	slog.Info(fmt.Sprintf("Server is listening on %s://%s", protocol, address))
+	slog.Info(fmt.Sprintf("server is listening on %s://%s", protocol, address))
 
 	// Shut down HTTP server gracefully.
 	ctx := context.Background()
@@ -149,13 +149,13 @@ func Run() error {
 		defer cancel()
 
 		if err = h.Shutdown(ctx); err != nil {
-			return fmt.Errorf("failed to shutdown HTTP server: %w", err)
+			return fmt.Errorf("failed to shutdown http server: %w", err)
 		}
 
-		slog.Debug("HTTP server shut down gracefully")
+		slog.Debug("shut down http server gracefully")
 	case err = <-errCh:
 		if err != nil && !errors.Is(err, net.ErrClosed) {
-			err = fmt.Errorf("failed to start HTTP server: %w", err)
+			err = fmt.Errorf("failed to start http server: %w", err)
 		}
 	}
 	return err

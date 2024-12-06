@@ -59,7 +59,7 @@ func TestBaseRoutes(t *testing.T) {
 		// The prometheus exporter middleware causes panics when running tests so it's necessary to use recover().
 		r := recover()
 		if r != nil {
-			t.Logf("Panic: %v", r)
+			t.Logf("panic: %v", r)
 		}
 	}()
 	//Load config
