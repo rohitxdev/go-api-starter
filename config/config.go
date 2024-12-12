@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -68,7 +70,12 @@ func Load() (*Config, error) {
 	var cfg Config
 	var errs []error
 
-	cfg.AppName = AppName
+	buildInfo, ok := debug.ReadBuildInfo()
+	if !ok {
+		return nil, errors.New("failed to get build info")
+	}
+
+	cfg.AppName = filepath.Base(buildInfo.Main.Path)
 	cfg.AppVersion = AppVersion
 	cfg.BuildType = BuildType
 	cfg.Env = env["ENV"]

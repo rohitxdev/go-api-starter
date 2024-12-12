@@ -59,7 +59,7 @@ func Run() error {
 		})
 	}
 	slog.SetDefault(slog.New(logHandler))
-	slog.Debug("running",
+	slog.Debug("starting",
 		slog.String("appName", cfg.AppName),
 		slog.String("appVersion", cfg.AppVersion),
 		slog.String("buildType", cfg.BuildType),
