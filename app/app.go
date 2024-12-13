@@ -59,9 +59,9 @@ func Run() error {
 		})
 	}
 	slog.SetDefault(slog.New(logHandler))
-	slog.Debug("starting",
-		slog.String("appName", cfg.AppName),
-		slog.String("appVersion", cfg.AppVersion),
+	slog.Debug("starting app",
+		slog.String("name", cfg.AppName),
+		slog.String("version", cfg.AppVersion),
 		slog.String("buildType", cfg.BuildType),
 		slog.String("env", cfg.Env),
 		slog.Int("maxProcs", runtime.GOMAXPROCS(0)),
