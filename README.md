@@ -1,31 +1,39 @@
-# Golang API starter
+# Go API
 
-<img src="./assets/public/images/go-fast.png" alt="Gopher flash" height="128" width="128"/>
+A simple Go-based RESTful API project.
 
-## Development
+## Features
 
-Run the development server:
+- RESTful endpoints
+- Modular project structure
+- Easy to extend
 
-```bash
-./run watch # or ./run docker-watch
+## Getting Started
+
+### Prerequisites
+
+- [Go](https://golang.org/dl/) 1.18 or higher
+
+### Installation
+
+```sh
+git clone https://github.com/yourusername/go-api.git
+cd go-api
+go mod tidy
 ```
 
-## Production
+### Running the API
 
-Build the project:
-
-```bash
-./run build
+```sh
+go run main.go
 ```
 
-Run the production server:
+The API will start on `http://localhost:8080`.
 
-```bash
-./run start
-```
+## Contributing
 
-## Notes
+Contributions are welcome! Please open issues or submit pull requests.
 
-- The `run` file is the project's task runner script. Run `./run` to see the available commands.
-- The config & secrets should be stored in the `.env` file in the `.local` directory. If you want to use a different file, you can specify it using the `ENV_FILE` environment variable.
-- If build fails due to an error in parsing 'default.pgo', you can delete the file and run `./run build` again.
+## License
+
+This project is licensed under the MIT License.
