@@ -1,34 +1,47 @@
-# syntax=docker/dockerfile:1
-ARG BASE_IMAGE_TAG
+# Actual base image tag must be passed during docker build
+ARG BASE_IMAGE_TAG=latest
 
+FROM golang:${BASE_IMAGE_TAG} AS base
 
-# Development image
-FROM golang${BASE_IMAGE_TAG} AS development
+# Manually set $GOCACHE to /go/pkg/cache because $GOCACHE defaults to /root/.cache/go-build. This way, we don't have to mount both /go and /root/.cache directories during build to use as cache.
+ENV GOCACHE=/go/pkg/cache
 
 WORKDIR /app
 
-RUN apk add --no-cache build-base bash git
+RUN apk add --no-cache curl
 
-RUN go install github.com/air-verse/air@latest
+# Development stage
+
+FROM base AS development
+
+RUN go install github.com/go-task/task/v3/cmd/task@latest
+
+COPY taskfile.yaml .
+
+RUN task init
 
 COPY go.mod go.sum ./
 
 RUN go mod download -x
 
-ENTRYPOINT ["./run", "watch"]
+ENTRYPOINT [ "task", "dev" ]
 
+# Release builder stage
 
-# Production builder image
-FROM development AS production-builder
+FROM base AS release-builder
+
+ARG BINARY_PATH
 
 COPY . .
 
-RUN ./run build
+RUN --mount=type=cache,target=/go go install github.com/go-task/task/v3/cmd/task@latest && task build:release
 
+RUN mv ${BINARY_PATH} ./main
 
-# Final production image
-FROM scratch AS production
+# Release stage
 
-COPY --from=production-builder /app/.local/bin .
+FROM scratch AS release
+
+COPY --from=release-builder /app/main .
 
 ENTRYPOINT ["./main"]

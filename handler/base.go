@@ -6,33 +6,52 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// @Summary Home page
-// @Success 200 {html} string "Home page"
-// @Router / [get]
 func (h *Handler) Home(c echo.Context) error {
 	return c.Render(http.StatusOK, "home", echo.Map{
-		"appName":    h.Config.AppName,
-		"appVersion": h.Config.AppVersion,
+		"appName":    cfg.AppName,
+		"appVersion": cfg.AppVersion,
 	})
 }
 
-type ClientConfig struct {
-	Env        string `json:"env"`
-	AppName    string `json:"appName"`
-	AppVersion string `json:"appVersion"`
+func (h *Handler) GetHealth(c echo.Context) error {
+	return c.JSON(200, APIResponse{Success: true})
 }
 
-// @Summary Get client config
-// @Success 200 {object} ResponseWithPayload[ClientConfig]
-// @Router /config [get]
-func (h *Handler) ClientConfig(c echo.Context) error {
-	return c.JSON(http.StatusOK, ResponseWithPayload[ClientConfig]{
-		Message: "Fetched config successfully",
+func (h *Handler) GetMe(c echo.Context) error {
+	user := getCurrentUser(c, h.Repo)
+	if user == nil {
+		return c.JSON(http.StatusUnauthorized, APIResponse{
+			Success: false,
+			Message: "user not authenticated",
+		})
+	}
+
+	return c.JSON(http.StatusOK, APIResponseWithPayload{
 		Success: true,
-		Payload: ClientConfig{
-			Env:        h.Config.Env,
-			AppName:    h.Config.AppName,
-			AppVersion: h.Config.AppVersion,
-		},
+		Message: "fetched user successfully",
+		Payload: user,
+	})
+}
+
+type clientConfig struct {
+	AppName    string `json:"app_name"`
+	AppVersion string `json:"app_version"`
+	BuildType  string `json:"build_type"`
+	CSRFToken  string `json:"csrf_token"`
+}
+
+func (h *Handler) GetConfig(c echo.Context) error {
+	cfg := clientConfig{
+		AppName:    cfg.AppName,
+		AppVersion: cfg.AppVersion,
+		BuildType:  cfg.BuildType,
+	}
+	if csrfToken, ok := c.Get("csrf").(string); ok {
+		cfg.CSRFToken = csrfToken
+	}
+	return c.JSON(http.StatusOK, APIResponseWithPayload{
+		Success: true,
+		Message: "fetched client config successfully",
+		Payload: cfg,
 	})
 }

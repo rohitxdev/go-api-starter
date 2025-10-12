@@ -1,129 +1,127 @@
 package config
 
 import (
-	"errors"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
 	"os"
-	"path/filepath"
-	"runtime/debug"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/go-playground/validator/v10"
-	"github.com/joho/godotenv"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
+	"github.com/caarlos0/env/v11"
+	"github.com/rohitxdev/go-api/util"
 )
 
-// These variables are set during compilation.
-var (
-	AppName    string
-	AppVersion string
-	BuildType  string
-)
+// This is set at build-time.
+var BuildInfoBase64 string
 
-type Config struct {
-	AppName               string
-	AppVersion            string
-	BuildType             string
-	Env                   string `validate:"required,oneof=development production"`
-	Host                  string `validate:"required,ip"`
-	Port                  string `validate:"required,gte=0"`
-	DatabaseURL           string `validate:"required"`
-	SMTPHost              string `validate:"required"`
-	SMTPUsername          string `validate:"required"`
-	SMTPPassword          string `validate:"required"`
-	SenderEmail           string `validate:"required"` // SenderEmail is the email address from which emails will be sent.
-	S3BucketName          string `validate:"required"`
-	S3Endpoint            string `validate:"required"`
-	S3DefaultRegion       string `validate:"required"`
-	AWSAccessKeyID        string `validate:"required"`
-	AWSAccessKeySecret    string `validate:"required"`
-	GoogleClientID        string // GoogleClientID is the client ID for Google OAuth2 authentication.
-	GoogleClientSecret    string
-	AccessTokenSecret     string `validate:"required"`
-	RefreshTokenSecret    string `validate:"required"`
-	CommonTokenSecret     string `validate:"required"`
-	GoogleOAuth2Config    *oauth2.Config
-	AllowedOrigins        []string
-	AccessTokenExpiresIn  time.Duration `validate:"required"`
-	RefreshTokenExpiresIn time.Duration `validate:"required"`
-	CommonTokenExpiresIn  time.Duration `validate:"required"`
-	SMTPPort              int           `validate:"required"`
-	IsDev                 bool
-	UseDevTLS             bool
+type BuildConfig struct {
+	AppName        string    `json:"app_name" validate:"required"`
+	AppVersion     string    `json:"app_version" validate:"required"`
+	BuildType      string    `json:"build_type" validate:"required"`
+	BuildTimestamp time.Time `json:"build_timestamp" validate:"required"`
 }
 
-func Load() (*Config, error) {
-	env, err := godotenv.Unmarshal(strings.Join(os.Environ(), "\n"))
+type RuntimeConfig struct {
+	AppEnv         appEnv   `json:"app_env" validate:"required,oneof=test development staging production" env:"APP_ENV"`
+	TmpDir         string   `json:"tmp_dir" validate:"required,dir" env:"TMP_DIR"`
+	PostgresURL    string   `json:"postgres_url" validate:"required,url" env:"POSTGRES_URL"`
+	HTTPHost       string   `json:"http_host" validate:"required" env:"HTTP_HOST"`
+	HTTPPort       string   `json:"http_port" validate:"required" env:"HTTP_PORT"`
+	AllowedOrigins []string `json:"allowed_origins" validate:"required"`
+	Debug          bool     `json:"debug" env:"DEBUG"`
+}
+
+var Config struct {
+	BuildConfig
+	RuntimeConfig
+}
+
+func fetchRuntimeConfig() ([]byte, error) {
+	url := os.Getenv("SECRETS_URL")
+	token := os.Getenv("SECRETS_TOKEN")
+	if url == "" {
+		return []byte("{}"), nil
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read environment variables: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	// Read from .env file if present.
-	if fileEnv, readErr := godotenv.Read(env["ENV_FILE"]); readErr != nil {
-		for key, value := range fileEnv {
-			env[key] = value
+
+	if token != "" {
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make GET request: %w", err)
+	}
+	defer func() {
+		if derr := res.Body.Close(); derr != nil && err == nil {
+			err = fmt.Errorf("failed to close response body: %w", derr)
 		}
+	}()
+
+	if res.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(res.Body)
+		return nil, fmt.Errorf("unexpected status %d: %s", res.StatusCode, string(body))
 	}
 
-	var cfg Config
-	var errs []error
-
-	buildInfo, ok := debug.ReadBuildInfo()
-	if !ok {
-		return nil, errors.New("failed to get build info")
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	cfg.AppName = filepath.Base(buildInfo.Main.Path)
-	cfg.AppVersion = AppVersion
-	cfg.BuildType = BuildType
-	cfg.Env = env["ENV"]
-	cfg.Host = env["HOST"]
-	cfg.Port = env["PORT"]
-	cfg.DatabaseURL = env["DATABASE_URL"]
-	cfg.SMTPHost = env["SMTP_HOST"]
-	cfg.SMTPUsername = env["SMTP_USERNAME"]
-	cfg.SMTPPassword = env["SMTP_PASSWORD"]
-	cfg.SenderEmail = env["SENDER_EMAIL"]
-	cfg.S3BucketName = env["S3_BUCKET_NAME"]
-	cfg.S3Endpoint = env["S3_ENDPOINT"]
-	cfg.S3DefaultRegion = env["S3_DEFAULT_REGION"]
-	cfg.AWSAccessKeyID = env["AWS_ACCESS_KEY_ID"]
-	cfg.AWSAccessKeySecret = env["AWS_ACCESS_KEY_SECRET"]
-	cfg.AccessTokenSecret = env["ACCESS_TOKEN_SECRET"]
-	cfg.RefreshTokenSecret = env["REFRESH_TOKEN_SECRET"]
-	cfg.CommonTokenSecret = env["COMMON_TOKEN_SECRET"]
-	cfg.AllowedOrigins = strings.Split(env["ALLOWED_ORIGINS"], ",")
-	if cfg.AccessTokenExpiresIn, err = time.ParseDuration(env["ACCESS_TOKEN_EXPIRES_IN"]); err != nil {
-		errs = append(errs, fmt.Errorf("failed to parse access token expires in: %w", err))
+	return b, nil
+}
+
+func loadConfig() error {
+	decodedBuildInfo, err := base64.StdEncoding.DecodeString(BuildInfoBase64)
+	if err != nil {
+		return fmt.Errorf("failed to decode build info base64 string: %w", err)
 	}
-	if cfg.RefreshTokenExpiresIn, err = time.ParseDuration(env["REFRESH_TOKEN_EXPIRES_IN"]); err != nil {
-		errs = append(errs, fmt.Errorf("failed to parse refresh token expires in: %w", err))
-	}
-	if cfg.CommonTokenExpiresIn, err = time.ParseDuration(env["COMMON_TOKEN_EXPIRES_IN"]); err != nil {
-		errs = append(errs, fmt.Errorf("failed to parse common token expires in: %w", err))
-	}
-	if cfg.SMTPPort, err = strconv.Atoi(env["SMTP_PORT"]); err != nil {
-		errs = append(errs, fmt.Errorf("failed to parse SMTP port: %w", err))
-	}
-	cfg.IsDev = env["ENV"] != "production"
-	cfg.UseDevTLS = env["USE_DEV_TLS"] == "true"
-	cfg.GoogleClientID = env["GOOGLE_CLIENT_ID"]
-	cfg.GoogleClientSecret = env["GOOGLE_CLIENT_SECRET"]
-	cfg.GoogleOAuth2Config = &oauth2.Config{
-		ClientID:     cfg.GoogleClientID,
-		ClientSecret: cfg.GoogleClientSecret,
-		Endpoint:     google.Endpoint,
-		RedirectURL:  fmt.Sprintf("https://%s/v1/auth/oauth2/callback/google", cfg.Host+":"+cfg.Port),
-		Scopes:       []string{"openid email", "openid profile"},
+	if err := json.Unmarshal(decodedBuildInfo, &Config.BuildConfig); err != nil {
+		return fmt.Errorf("failed to unmarshal build info: %w", err)
 	}
 
-	if err = validator.New().Struct(cfg); err != nil {
-		errs = append(errs, fmt.Errorf("failed to validate config: %w", err))
+	if err := env.Parse(&Config); err != nil {
+		return fmt.Errorf("failed to parse env as config: %w", err)
 	}
 
-	err = errors.Join(errs...)
+	Config.AllowedOrigins = strings.Split(",", os.Getenv("ALLOWED_ORIGINS"))
 
-	return &cfg, err
+	b, err := fetchRuntimeConfig()
+	if err != nil {
+		return fmt.Errorf("failed to fetch config: %w", err)
+	}
+	if err = json.Unmarshal(b, &Config.RuntimeConfig); err != nil {
+		return fmt.Errorf("failed to unmarshal fetched config: %w", err)
+	}
+
+	if err := util.Validate.Struct(Config); err != nil {
+		return fmt.Errorf("failed to validate config: %w", err)
+	}
+	return nil
+}
+
+func init() {
+	if err := loadConfig(); err != nil {
+		panic(fmt.Errorf("failed to load config: %w", err))
+	}
+
+	go func() {
+		interval := 5 * time.Minute
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			if err := loadConfig(); err != nil {
+				slog.Error("failed to refetch config", slog.Any("error", err))
+			}
+		}
+	}()
 }

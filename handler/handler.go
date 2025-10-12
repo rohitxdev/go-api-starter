@@ -2,97 +2,62 @@ package handler
 
 import (
 	"fmt"
-	"html/template"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
+	"text/template"
 	"time"
 
+	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/go-playground/validator"
-	gojson "github.com/goccy/go-json"
+	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo-contrib/pprof"
+	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/oklog/ulid/v2"
-	"github.com/rohitxdev/go-api-starter/assets"
-	"github.com/rohitxdev/go-api-starter/blobstore"
-	"github.com/rohitxdev/go-api-starter/config"
-	"github.com/rohitxdev/go-api-starter/email"
-	"github.com/rohitxdev/go-api-starter/repo"
+	"github.com/rohitxdev/go-api/assets"
+	"github.com/rohitxdev/go-api/config"
+	"github.com/rohitxdev/go-api/database/repository"
 )
 
-type Service struct {
-	BlobStore *blobstore.Store
-	Config    *config.Config
-	Email     *email.Client
-	Repo      *repo.Repo
-}
-
-func (s *Service) Close() error {
-	if err := s.Repo.Close(); err != nil {
-		return fmt.Errorf("failed to close repo: %w", err)
-	}
-	return nil
+type Services struct {
+	Cache *cache.Cache[string]
+	Repo  *repository.Queries
 }
 
 type Handler struct {
-	*Service
+	*Services
 }
 
-// Custom view renderer
-type renderer struct {
-	templates *template.Template
-}
+func registerRoutes(e *echo.Echo, h *Handler) {
+	e.GET("/metrics", echoprometheus.NewHandler())
+	e.GET("/health", h.GetHealth)
+	e.GET("/config", h.GetConfig)
+	e.GET("/", h.Home)
 
-func (t renderer) Render(w io.Writer, name string, data any, c echo.Context) error {
-	return t.templates.ExecuteTemplate(w, name+".tmpl", data)
-}
-
-// Custom request validator
-type requestValidator struct {
-	validator *validator.Validate
-}
-
-func (v requestValidator) Validate(i any) error {
-	if err := v.validator.Struct(i); err != nil {
-		return echo.NewHTTPError(http.StatusUnprocessableEntity, err)
+	auth := e.Group("/auth")
+	{
+		auth.POST("/otp/send", h.SendAuthOTP)
+		auth.POST("/otp/verify", h.VerifyAuthOTP)
+		auth.POST("/sign-out", h.SignOut)
 	}
-	return nil
-}
 
-// Custom JSON serializer & deserializer
-type jsonSerializer struct{}
-
-func (s jsonSerializer) Serialize(c echo.Context, data any, indent string) error {
-	enc := gojson.NewEncoder(c.Response())
-	enc.SetIndent("", indent)
-	return enc.Encode(data)
-}
-
-func (s jsonSerializer) Deserialize(c echo.Context, v any) error {
-	dec := gojson.NewDecoder(c.Request().Body)
-	err := dec.Decode(v)
-	if ute, ok := err.(*gojson.UnmarshalTypeError); ok {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Unmarshal type error: expected=%v, got=%v, field=%v, offset=%v", ute.Type, ute.Value, ute.Field, ute.Offset)).SetInternal(err)
-	} else if se, ok := err.(*gojson.SyntaxError); ok {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Syntax error: offset=%v, error=%v", se.Offset, se.Error())).SetInternal(err)
+	users := e.Group("/users")
+	{
+		users.GET("/me", h.GetMe)
 	}
-	return err
 }
 
-func New(svc *Service) (*echo.Echo, error) {
-	h := Handler{Service: svc}
+func New(svc *Services) (*echo.Echo, error) {
+	h := Handler{Services: svc}
 
 	e := echo.New()
-
 	e.JSONSerializer = jsonSerializer{}
-
 	e.Validator = requestValidator{
 		validator: validator.New(),
 	}
-
 	e.IPExtractor = echo.ExtractIPFromXFFHeader(
 		echo.TrustLoopback(false),   // e.g. ipv4 start with 127.
 		echo.TrustLinkLocal(false),  // e.g. ipv4 start with 169.254
@@ -103,18 +68,21 @@ func New(svc *Service) (*echo.Echo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse templates: %w", err)
 	}
-	e.Renderer = renderer{
+	e.Renderer = viewRenderer{
 		templates: pageTemplates,
 	}
 
 	e.HTTPErrorHandler = func(err error, c echo.Context) {
 		defer func() {
 			if err != nil {
-				slog.Error("HTTP error response failure", slog.String("id", c.Response().Header().Get(echo.HeaderXRequestID)), slog.String("error", err.Error()))
+				slog.Error("HTTP error response failure",
+					slog.Group("request", slog.String("id", c.Response().Header().Get(echo.HeaderXRequestID))),
+					slog.String("error", err.Error()),
+				)
 			}
 		}()
 
-		var res Response
+		var res APIResponse
 		if httpErr, ok := err.(*echo.HTTPError); ok {
 			switch msg := httpErr.Message.(type) {
 			case string:
@@ -126,22 +94,20 @@ func New(svc *Service) (*echo.Echo, error) {
 			}
 			err = c.JSON(httpErr.Code, res)
 		} else {
-			res.Message = MsgSomethingWentWrong
+			res.Message = MsgInternalServerError
 			err = c.JSON(http.StatusInternalServerError, res)
 		}
 	}
 
 	//Pre-router middlewares
-	if !h.Config.IsDev {
-		e.Pre(middleware.CSRF())
-	}
+	e.Pre(middleware.CSRF())
 
 	e.Pre(middleware.Secure())
 
 	e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins:                             h.Config.AllowedOrigins,
+		AllowOrigins:                             cfg.AllowedOrigins,
 		AllowCredentials:                         true,
-		UnsafeWildcardOriginWithAllowCredentials: h.Config.IsDev,
+		UnsafeWildcardOriginWithAllowCredentials: cfg.AppEnv != config.EnvProduction,
 	}))
 
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
@@ -174,30 +140,43 @@ func New(svc *Service) (*echo.Echo, error) {
 					errStr = httpErr.Error()
 				}
 			} else if v.Error != nil {
-				// Due to a bug in echo, when the error is not an echo.HTTPError, even though the status code sent is 500, it's logged as 200 in this middleware. We need to manually set the status code in the log to 500.
+				// Due to a bug in echo, when the error is not an echo.HTTPError, even though the status code sent is 500, it's logged as 200 in this middleware.
+				// We need to manually set the status code in the log to 500.
 				status = http.StatusInternalServerError
 			}
 
-			var userID uint64
-			if user, ok := c.Get("user").(*repo.User); ok && (user != nil) {
-				userID = user.ID
+			var userID string
+			if user, ok := c.Get("user").(*repository.User); ok && (user != nil) {
+				userID = user.ID.String()
 			}
 
-			slog.Info("http request",
+			attrs := []any{
 				slog.String("id", v.RequestID),
-				slog.String("clientIp", v.RemoteIP),
+				slog.String("client_ip", v.RemoteIP),
 				slog.String("protocol", v.Protocol),
 				slog.String("uri", v.URI),
 				slog.String("method", v.Method),
-				slog.Int64("durationMs", v.Latency.Milliseconds()),
-				slog.Int64("bytesOut", v.ResponseSize),
-				slog.String("host", v.Host),
-				slog.String("ua", v.UserAgent),
-				slog.String("referer", v.Referer),
-				slog.Uint64("userId", userID),
+				slog.Int64("duration_ms", v.Latency.Milliseconds()),
+				slog.Int64("res_bytes", v.ResponseSize),
 				slog.Int("status", status),
-				slog.String("error", errStr),
-			)
+			}
+			if v.Host != "" {
+				attrs = append(attrs, slog.String("host", v.Host))
+			}
+			if v.UserAgent != "" {
+				attrs = append(attrs, slog.String("user_agent", v.UserAgent))
+			}
+			if v.Referer != "" {
+				attrs = append(attrs, slog.String("referer", v.Referer))
+			}
+			if userID != "" {
+				attrs = append(attrs, slog.String("user_id", userID))
+			}
+			if errStr != "" {
+				attrs = append(attrs, slog.String("error", errStr))
+			}
+
+			slog.Info("HTTP request", attrs...)
 			return nil
 		},
 	}))
@@ -205,6 +184,9 @@ func New(svc *Service) (*echo.Echo, error) {
 	e.Pre(middleware.RemoveTrailingSlash())
 
 	//Post-router middlewares
+	sessionStore := sessions.NewCookieStore([]byte("auth-secret"))
+	e.Use(session.Middleware(sessionStore))
+
 	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{
 		Skipper: func(c echo.Context) bool {
 			return !strings.Contains(c.Request().Header.Get("Accept-Encoding"), "gzip") || strings.HasPrefix(c.Path(), "/metrics")
@@ -222,7 +204,8 @@ func New(svc *Service) (*echo.Echo, error) {
 
 	// This middleware causes data races, but it's not a big deal. See https://github.com/labstack/echo/issues/1761
 	e.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
-		Timeout: time.Second * 10, Skipper: func(c echo.Context) bool {
+		Timeout: time.Minute,
+		Skipper: func(c echo.Context) bool {
 			return strings.HasPrefix(c.Path(), "/debug/pprof")
 		},
 	}))
@@ -231,7 +214,7 @@ func New(svc *Service) (*echo.Echo, error) {
 
 	pprof.Register(e)
 
-	mountRoutes(e, &h)
+	registerRoutes(e, &h)
 
 	return e, nil
 }
