@@ -1,0 +1,321 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: '3'
+
+run: once
+
+method: timestamp
+
+vars:
+  CURRENT_TIMESTAMP:
+    sh: date -u +"%Y-%m-%dT%H:%M:%SZ"
+  MODULE_NAME:
+    sh: go list -m -f '{{"{{.Path}}"}}'
+  # The go version as present in the go.mod file in the root directory of the project.
+  GO_VERSION:
+    sh: go list -m -f '{{"{{.GoVersion}}"}}'
+  # The application name.
+  APP_NAME:
+    sh: basename {{.MODULE_NAME}}
+  # The application version derived from git tags.
+  APP_VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo "latest"
+  # The directory used to store temporary artifacts. It is neither committed to the git repo nor copied into the docker image.
+  TMP_DIR:
+    sh: path=".tmp" && mkdir -p "$path" && echo "$path"
+  # The file path used to store the built binary of the go project.
+  BINARY_PATH: "{{.TMP_DIR}}/main.exe"
+  # The file path used to store the test coverage report.
+  TEST_COVERAGE_PATH: "{{.TMP_DIR}}/test-coverage.out"
+  # The directory used to store all the database migration scripts.
+  MIGRATIONS_DIR: database/migrations
+  BASE_IMAGE_TAG: "{{.GO_VERSION}}-alpine3.22"
+
+dotenv:
+  - .env
+
+env:
+  BASE_IMAGE_TAG: "{{.BASE_IMAGE_TAG}}"
+  TMP_DIR: "{{.TMP_DIR}}"
+
+tasks:
+
+  # ----------------------------
+  # Miscellaneous
+  # ----------------------------
+
+  default:
+    cmds:
+      - task --list
+
+  init:
+    desc: Initialize the project by installing required dependencies and tools.
+    cmds:
+      - |
+        set -e
+        (
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0 &
+          go install github.com/air-verse/air@v1.63.0 &
+          go install github.com/pressly/goose/v3/cmd/goose@v3.25.0 &
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.5.0 &
+          wait
+        )
+    status:
+      - which sqlc
+      - which air
+      - which goose
+      - which golangci-lint
+
+  upgrade:
+    desc: Upgrade minor versions of all packages.
+    cmds:
+      - go get -u ./...
+      - echo "To upgrade major versions, run 'go get -u <package>@<version>' manually"
+      - go mod tidy
+    aliases:
+      - update
+
+  pprof:gen:
+    desc: Generate a pprof profile for the running Go app.
+    cmds:
+      - |
+        read -p "HTTP server address: " -r address
+        read -p "Duration (seconds): " -r duration
+        address=$(echo "$address" | xargs)
+        duration=$(echo "$duration" | xargs)
+        url="https://$address/debug/pprof/profile?seconds=$duration"
+        echo "Generating pprof profile from $url"
+        curl -sSfL --insecure "$url" > default.pgo
+
+  # ----------------------------
+  # SQLC code generation
+  # ----------------------------
+
+  sqlc:gen:
+    desc: Generate type-safe Go code for database access.
+    deps:
+      - init
+    cmds:
+      - sqlc generate
+    sources:
+      - database/migrations/**/*
+      - database/queries/**/*
+      - sqlc.yaml
+    generates:
+      - database/repository/**/*
+    internal: true
+
+  # ----------------------------
+  # Build tasks
+  # ----------------------------
+
+  build:
+    desc: Build go binary with customizations.
+    deps:
+      - sqlc:gen
+    vars:
+      BUILD_INFO: |
+        {
+          "app_name":"{{.APP_NAME}}",
+          "app_version":"{{.APP_VERSION}}",
+          "build_type":"{{.BUILD_TYPE}}",
+          "build_timestamp":"{{.CURRENT_TIMESTAMP}}"
+        }
+      LDFLAGS: "{{.LDFLAGS}} -X {{.MODULE_NAME}}/config.BuildInfoBase64={{.BUILD_INFO | b64enc}}"
+      FLAGS: "{{.FLAGS}} -o {{.BINARY_PATH}}"
+    requires:
+      vars:
+        - BUILD_TYPE
+    cmds:
+    - go build -ldflags="{{.LDFLAGS}}" {{.FLAGS}} cmd/app/main.go
+    internal: true
+
+  build:debug:
+    desc: Build Go binary with debug info and minimal optimizations for local development.
+    cmds:
+      - task: build
+        vars:
+          BUILD_TYPE: debug
+
+  build:release:
+    desc: Build an optimized, statically-linked Go binary for production release.
+    cmds:
+      - task: build
+        vars:
+          BUILD_TYPE: release
+          LDFLAGS: -s -w -extldflags=-static
+          FLAGS: -trimpath
+
+  docker:build:release:
+    desc: Build the docker image of the application for production release.
+    vars:
+      IMAGE_TAG: "{{.APP_NAME}}:{{.APP_VERSION}}"
+    cmds:
+      - docker rmi -f "{{.IMAGE_TAG}}" || true
+      - docker image prune -f
+      - >
+        docker build
+        --platform linux/amd64
+        --tag "{{.IMAGE_TAG}}"
+        --target "release"
+        --build-arg BASE_IMAGE_TAG="{{.BASE_IMAGE_TAG}}"
+        --build-arg BINARY_PATH="{{.BINARY_PATH}}"
+        .
+
+  # ----------------------------
+  # Run
+  # ----------------------------
+
+  devcerts:gen:
+    desc: Generate self-signed TLS certificates for localhost development.
+    cmds:
+      - go run cmd/devcerts/main.go -cache-dir={{.TMP_DIR}}
+    sources:
+      - cmd/devcerts/main.go
+    generates:
+      - "{{.TMP_DIR}}/localhost.crt"
+      - "{{.TMP_DIR}}/localhost.key"
+    internal: true
+
+  run:debug:
+    desc: Run the application using the debug build.
+    deps:
+      - build:debug
+      - devcerts:gen
+    cmds:
+      - "{{.BINARY_PATH}}"
+    interactive: true
+
+  run:release:
+    desc: Run the application using the release build.
+    deps:
+      - build:release
+      - devcerts:gen
+    cmds:
+      - "{{.BINARY_PATH}}"
+    interactive: true
+
+  # ----------------------------
+  # Development
+  # ----------------------------
+
+  dev:
+    desc: Run development server with live reloading.
+    deps:
+      - init
+      - devcerts:gen
+    cmds:
+      - >
+        air
+        --tmp_dir {{.TMP_DIR}}
+        --build.bin {{.BINARY_PATH}}
+        --build.cmd "task build:debug"
+        --build.poll true
+        --build.send_interrupt true
+        --build.include_ext go,sql,tmpl
+        --log.main_only true
+    interactive: true
+
+  docker:dev:
+    desc: Run development server with live reloading & external dependencies in Docker using docker compose.
+    vars:
+      COMPOSE_PATH: compose.dev.yaml
+    cmds:
+      - docker compose -f "{{.COMPOSE_PATH}}" down --remove-orphans
+      - docker compose -f "{{.COMPOSE_PATH}}" rm --force
+      - docker compose -f "{{.COMPOSE_PATH}}" up --build
+
+  # ----------------------------
+  # Testing & Benchmarking
+  # ----------------------------
+
+  test:
+    desc: Run all tests and generate coverage report.
+    cmds:
+      - go test -count=2 -v -covermode=atomic -coverprofile={{.TEST_COVERAGE_PATH}} ./...
+      - go tool cover -func={{.TEST_COVERAGE_PATH}}
+
+  test:view:
+    desc: View coverage report in browser.
+    deps:
+      - test
+    cmds:
+      - go tool cover -html={{.TEST_COVERAGE_PATH}}
+
+  benchmark:
+    desc: Run all benchmarks.
+    cmds:
+      - go test -count=2 -v -benchmem -bench=. ./...
+
+  # ----------------------------
+  # Database migrations
+  # ----------------------------
+
+  migrate:new:
+    desc: Create a new migration.
+    deps:
+      - init
+    cmds:
+      - |
+        read -p "Migration name: " -r name
+        goose -s create --dir {{.MIGRATIONS_DIR}} $name sql
+    interactive: true
+
+  migrate:
+    desc: Migrate database up to the latest version.
+    deps:
+      - init
+    cmds:
+      - goose --dir {{.MIGRATIONS_DIR}} postgres "{{.POSTGRES_URL}}" {{.CLI_ARGS}}
+
+  # ----------------------------
+  # Version control & CI
+  # ----------------------------
+
+  lint:
+    desc: Lint go code.
+    deps:
+      - init
+    cmds:
+      - golangci-lint run --enable govet,gosec,tparallel,whitespace,recvcheck,sloglint ./...
+    sources:
+      - ./**/*.go
+    internal: true
+
+  fmt:
+    desc: Format go code.
+    deps:
+      - init
+    cmds:
+      - golangci-lint fmt --enable gofmt,goimports ./...
+    sources:
+      - ./**/*.go
+    internal: true
+
+  ci:
+    desc: Run CI checks.
+    deps:
+      - lint
+      - fmt
+      - build:release
+      - test
+
+  git:push:
+    desc: Push the latest git commit to the remote repository.
+    deps:
+      - git:commit
+    cmds:
+      - git push
+
+  git:commit:
+    desc: Create a git commit and push to the remote repository.
+    deps:
+      - build:release
+    cmds:
+      - cat .gitignore > .dockerignore
+      - |
+        read -p "Commit message (optional): " -r msg
+        git commit -am "${msg:-"WIP - {{.CURRENT_TIMESTAMP}}"}"
+    status:
+      - test -z "$(git status --porcelain)"
+    preconditions:
+      - git rev-parse --is-inside-work-tree

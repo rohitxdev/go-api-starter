@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: main
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  api:
+    depends_on:
+      - postgres
+    build:
+      context: .
+      target: development
+      args:
+        - BASE_IMAGE_TAG=${BASE_IMAGE_TAG}
+    container_name: api
+    environment:
+      POSTGRES_URL: postgresql://postgres:postgres@postgres:5432/main
+      HTTP_HOST: 0.0.0.0
+    ports:
+      - ${HTTP_PORT}:${HTTP_PORT}
+    volumes:
+      - .:/app
+      - task_dir:/app/.task
+      - tmp_dir:/app/.tmp
+volumes:
+  postgres_data:
+  task_dir:
+  tmp_dir:
