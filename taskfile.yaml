@@ -36,6 +36,7 @@ env:
   BASE_IMAGE_TAG: "{{.BASE_IMAGE_TAG}}"
   TMP_DIR: "{{.TMP_DIR}}"
   TASKFILE_VERSION: "{{.TASKFILE_VERSION}}"
+  CGO_ENABLED: "0"
 
 tasks:
   # ----------------------------
