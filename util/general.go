@@ -1,6 +1,12 @@
 package util
 
-import "github.com/go-playground/validator"
+import (
+	"runtime/debug"
+
+	"github.com/go-playground/validator"
+)
+
+var Validate = validator.New()
 
 func Coalesce[T comparable](values ...T) T {
 	var zero T
@@ -12,4 +18,21 @@ func Coalesce[T comparable](values ...T) T {
 	return zero
 }
 
-var Validate = validator.New()
+func CapturePanic[T any](fn func() T) (res T, panicVal any, stack []byte) {
+	defer func() {
+		if r := recover(); r != nil {
+			panicVal = r
+			stack = debug.Stack()
+		}
+	}()
+	res = fn()
+	return
+}
+
+func Must[T any](fn func() (T, error)) T {
+	val, err := fn()
+	if err != nil {
+		panic(err)
+	}
+	return val
+}

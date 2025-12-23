@@ -1,13 +1,11 @@
-// This package provides functionality for sending emails.
-package application
+package email
 
 import (
 	"bytes"
 	"fmt"
+	"html/template"
 	"io"
-	"io/fs"
 	"net/http"
-	"text/template"
 
 	"github.com/oklog/ulid/v2"
 	"gopkg.in/gomail.v2"
@@ -20,23 +18,16 @@ type SMTPCredentials struct {
 	Port     int
 }
 
-// Client is an email client that handles sending emails through SMTP.
-type EmailClient struct {
+type Client struct {
 	dialer    *gomail.Dialer
 	templates *template.Template
 }
 
-// New creates a new email client with the provided credentials and templates.
-func NewEmailClient(sc *SMTPCredentials, assetsFS fs.FS) (*EmailClient, error) {
-	t, err := template.ParseFS(assetsFS, "templates/emails/*.tmpl")
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse email templates: %w", err)
-	}
-
+func New(sc *SMTPCredentials, templates *template.Template) (*Client, error) {
 	dialer := gomail.NewDialer(sc.Host, sc.Port, sc.Username, sc.Password)
-	client := EmailClient{
+	client := Client{
 		dialer:    dialer,
-		templates: t,
+		templates: templates,
 	}
 
 	return &client, nil
@@ -61,7 +52,7 @@ type BaseOpts struct {
 }
 
 // 'send' sends an email with raw content of the specified MIME type.
-func (ec *EmailClient) send(opts *BaseOpts, mimeType string, body string, attachments ...Attachment) error {
+func (ec *Client) send(opts *BaseOpts, mimeType string, body string, attachments ...Attachment) error {
 	msg := gomail.NewMessage()
 
 	msg.SetHeaders(map[string][]string{
@@ -108,16 +99,16 @@ func (ec *EmailClient) send(opts *BaseOpts, mimeType string, body string, attach
 }
 
 // SendHtml sends an HTML email using a template.
-func (ec *EmailClient) SendHTML(opts *BaseOpts, templateName string, data map[string]any, attachments ...Attachment) error {
+func (ec *Client) SendHTML(opts *BaseOpts, templateName string, data map[string]any, attachments ...Attachment) error {
 	var buf bytes.Buffer
 	if err := ec.templates.ExecuteTemplate(&buf, templateName+".tmpl", data); err != nil {
-		// '%q' prints the template name in quotes
+		// '%q' prints in quotes
 		return fmt.Errorf("failed to execute template %q: %w", templateName, err)
 	}
 	return ec.send(opts, "text/html", buf.String(), attachments...)
 }
 
 // SendText sends a plain text email.
-func (ec *EmailClient) SendText(opts *BaseOpts, body string, attachments ...Attachment) error {
+func (ec *Client) SendText(opts *BaseOpts, body string, attachments ...Attachment) error {
 	return ec.send(opts, "text/plain", body, attachments...)
 }

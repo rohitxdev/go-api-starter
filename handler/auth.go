@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"fmt"
 	"net/http"
 	"net/netip"
 	"time"
@@ -24,19 +23,18 @@ func (h *Handler) SendAuthOTP(c echo.Context) error {
 	req.Email = canonicalizeEmail(req.Email)
 	code, err := util.GenerateAlphaNumCode(6)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Message: "failed to generate OTP",
+		return c.JSON(http.StatusInternalServerError, APIErrorResponse{
+			Error: "failed to generate OTP",
 		})
 	}
 	user, err := h.Repo.UpsertUser(c.Request().Context(), req.Email)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Errorf("failed to upsert user: %w", err))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to upsert user").SetInternal(err)
 	}
 
 	codeHash, err := util.GenerateSecureHash([]byte(code))
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Errorf("failed to hash security code: %w", err))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to hash verification code", err)
 	}
 
 	if err = h.Repo.CreateOtp(c.Request().Context(), repository.CreateOtpParams{
@@ -47,13 +45,11 @@ func (h *Handler) SendAuthOTP(c echo.Context) error {
 			Valid: true,
 		},
 	}); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, fmt.Errorf("failed to create OTP: %w", err))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create OTP").SetInternal(err)
 	}
 
-	return c.JSON(http.StatusOK, APIResponseWithPayload{
-		Success: true,
-		Message: "sign in OTP sent successfully",
-		Payload: echo.Map{
+	return c.JSON(http.StatusOK, APISuccessResponse{
+		Data: echo.Map{
 			"userId": user.ID,
 			"code":   code,
 		},
@@ -71,31 +67,31 @@ func (h *Handler) VerifyAuthOTP(c echo.Context) error {
 
 	otp, err := h.Repo.GetOtpByUserId(c.Request().Context(), req.UserID)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, APIResponse{
-			Message: "otp not found or invalid",
+		return c.JSON(http.StatusBadRequest, APIErrorResponse{
+			Error: "otp not found or invalid",
 		})
 	}
 	if otp.Attempts > 3 {
 		if err = h.Repo.DeleteOtp(c.Request().Context(), otp.ID); err != nil {
-			return serverError(fmt.Errorf("failed to delete OTP: %w", err))
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete OTP").SetInternal(err)
 		}
-		return c.JSON(http.StatusForbidden, APIResponse{
-			Message: "max attempts exceeded",
+		return c.JSON(http.StatusForbidden, APIErrorResponse{
+			Error: "max attempts exceeded",
 		})
 	}
 
 	if err = h.Repo.IncrementOtpAttempts(c.Request().Context(), req.UserID); err != nil {
-		return serverError(fmt.Errorf("failed to increment OTP attempts: %w", err))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to increment OTP attempts").SetInternal(err)
 	}
 
 	if !util.VerifySecureHash([]byte(req.Code), otp.CodeHash) {
-		return c.JSON(http.StatusBadRequest, APIResponse{
-			Message: "invalid OTP code",
+		return c.JSON(http.StatusBadRequest, APIErrorResponse{
+			Error: "invalid OTP code",
 		})
 	}
 
 	if err = h.Repo.DeleteOtp(c.Request().Context(), otp.ID); err != nil {
-		return serverError(fmt.Errorf("failed to delete OTP: %w", err))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete OTP").SetInternal(err)
 	}
 
 	if _, err = h.Repo.UpdateUser(
@@ -107,12 +103,12 @@ func (h *Handler) VerifyAuthOTP(c echo.Context) error {
 				Valid: true,
 			},
 		}); err != nil {
-		return serverError(fmt.Errorf("failed to update user: %w", err))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to update user").SetInternal(err)
 	}
 
 	ipAddress, err := netip.ParseAddr(c.RealIP())
 	if err != nil {
-		return serverError(fmt.Errorf("failed to parse client IP address: %w", err))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to parse client IP address").SetInternal(err)
 	}
 
 	sessionId, err := h.Repo.CreateSession(
@@ -126,41 +122,35 @@ func (h *Handler) VerifyAuthOTP(c echo.Context) error {
 			IpAddress: ipAddress,
 		})
 	if err != nil {
-		return serverError(fmt.Errorf("failed to create session: %w", err))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create session entity").SetInternal(err)
 	}
 
 	sess, err := session.Get("session", c)
 	if err != nil {
-		return serverError(fmt.Errorf("failed to get session: %w", err))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get session").SetInternal(err)
 	}
 
-	sess.Values["session_id"] = sessionId.String()
+	sess.Values["sessionID"] = sessionId.String()
 	if err = sess.Save(c.Request(), c.Response()); err != nil {
-		return serverError(fmt.Errorf("failed to get session: %w", err))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to save session").SetInternal(err)
 	}
 
-	return c.JSON(http.StatusOK, APIResponse{
-		Success: true,
-		Message: "OTP verified successfully",
-	})
+	return c.NoContent(http.StatusOK)
 }
 
 func (h *Handler) SignOut(c echo.Context) error {
 	sess, err := session.Get("session", c)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, APIResponse{
-			Message: "user not signed in",
+		return c.JSON(http.StatusBadRequest, APIErrorResponse{
+			Error: "user is not signed in",
 		})
 	}
 
 	sess.Options.MaxAge = -1
 
 	if err = sess.Save(c.Request(), c.Response()); err != nil {
-		return serverError(fmt.Errorf("failed to save session: %w", err))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to save session").SetInternal(err)
 	}
 
-	return c.JSON(http.StatusOK, APIResponse{
-		Success: true,
-		Message: "logged out successfully",
-	})
+	return c.NoContent(http.StatusOK)
 }

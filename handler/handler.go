@@ -2,40 +2,62 @@ package handler
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"text/template"
 	"time"
 
-	"github.com/eko/gocache/lib/v4/cache"
-	"github.com/go-playground/validator"
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo-contrib/pprof"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
-	"github.com/oklog/ulid/v2"
+	echomiddleware "github.com/labstack/echo/v4/middleware"
+	"github.com/redis/go-redis/v9"
 	"github.com/rohitxdev/go-api/assets"
-	"github.com/rohitxdev/go-api/config"
 	"github.com/rohitxdev/go-api/database/repository"
+	"github.com/rohitxdev/go-api/deps/blobstore"
+	"github.com/rohitxdev/go-api/deps/cache"
+	"github.com/rohitxdev/go-api/deps/config"
+	"github.com/rohitxdev/go-api/deps/email"
+	"github.com/rohitxdev/go-api/handler/middleware"
+	"github.com/rohitxdev/go-api/util"
 )
 
-type Services struct {
-	Cache *cache.Cache[string]
-	Repo  *repository.Queries
+const (
+	HeaderXClientID = "X-Client-ID"
+	HeaderXTraceID  = "X-Trace-ID"
+)
+
+type Dependencies struct {
+	BlobStore *blobstore.BlobStore
+	Config    *config.Config
+	Cache     *cache.Cache[string]
+	Email     *email.Client
+	Logger    *slog.Logger
+	Redis     *redis.Client
+	Repo      *repository.Queries
 }
 
 type Handler struct {
-	*Services
+	*Dependencies
 }
 
 func registerRoutes(e *echo.Echo, h *Handler) {
 	e.GET("/metrics", echoprometheus.NewHandler())
-	e.GET("/health", h.GetHealth)
 	e.GET("/config", h.GetConfig)
-	e.GET("/", h.Home)
+
+	e.GET("/", func(c echo.Context) error {
+		return c.Redirect(http.StatusTemporaryRedirect, "/views/home")
+	})
+
+	views := e.Group("/views")
+	{
+		views.GET("/home", h.Home)
+	}
 
 	auth := e.Group("/auth")
 	{
@@ -50,13 +72,29 @@ func registerRoutes(e *echo.Echo, h *Handler) {
 	}
 }
 
-func New(svc *Services) (*echo.Echo, error) {
-	h := Handler{Services: svc}
+type countingReadCloser struct {
+	rc io.ReadCloser
+	n  int64
+}
+
+func (c *countingReadCloser) Read(buf []byte) (int, error) {
+	n, err := c.rc.Read(buf)
+	c.n += int64(n)
+	return n, err
+}
+
+func (c *countingReadCloser) Close() error {
+	return c.rc.Close()
+}
+
+func New(deps *Dependencies) (*echo.Echo, error) {
+	cfg := deps.Config
+	h := Handler{Dependencies: deps}
 
 	e := echo.New()
-	e.JSONSerializer = jsonSerializer{}
+	e.JSONSerializer = JSONSerializer{}
 	e.Validator = requestValidator{
-		validator: validator.New(),
+		validator: util.Validate,
 	}
 	e.IPExtractor = echo.ExtractIPFromXFFHeader(
 		echo.TrustLoopback(false),   // e.g. ipv4 start with 127.
@@ -73,144 +111,122 @@ func New(svc *Services) (*echo.Echo, error) {
 	}
 
 	e.HTTPErrorHandler = func(err error, c echo.Context) {
-		defer func() {
-			if err != nil {
-				slog.Error("HTTP error response failure",
-					slog.Group("request", slog.String("id", c.Response().Header().Get(echo.HeaderXRequestID))),
-					slog.String("error", err.Error()),
-				)
-			}
-		}()
+		var (
+			traceID     string
+			panicReason any
+			panicStack  string
+			status      = http.StatusInternalServerError
+			msg         = http.StatusText(status)
+		)
 
-		var res APIResponse
-		if httpErr, ok := err.(*echo.HTTPError); ok {
-			switch msg := httpErr.Message.(type) {
+		if v, ok := c.Get("traceID").(string); ok {
+			traceID = v
+		}
+		if v := c.Get("panicReason"); v != nil {
+			panicReason = v
+		}
+		if v, ok := c.Get("panicStack").(string); ok {
+			panicStack = v
+		}
+
+		attrs := []any{slog.String("trace_id", traceID)}
+
+		if panicReason != nil && panicStack != "" {
+			msg = "panic recovered"
+			attrs = append(attrs,
+				slog.Any("error", panicReason),
+				slog.String("call_stack", panicStack),
+			)
+
+		} else if httpErr, ok := err.(*echo.HTTPError); ok {
+			switch httpErrMsg := httpErr.Message.(type) {
 			case string:
-				res.Message = msg
+				msg = httpErrMsg
 			case error:
-				res.Message = msg.Error()
+				msg = httpErrMsg.Error()
 			default:
-				res.Message = httpErr.Error()
+				msg = httpErr.Error()
 			}
-			err = c.JSON(httpErr.Code, res)
-		} else {
-			res.Message = MsgInternalServerError
-			err = c.JSON(http.StatusInternalServerError, res)
+
+			if httpErr.Internal != nil {
+				attrs = append(attrs, slog.String("error", httpErr.Internal.Error()))
+			}
+
+			status = httpErr.Code
+		}
+
+		if status == http.StatusInternalServerError {
+			h.Logger.Error(msg, attrs...)
+		}
+
+		if err := c.JSON(status, APIErrorResponse{Error: msg}); err != nil {
+			h.Logger.Error("failed to send response",
+				slog.String("trace_id", traceID),
+				slog.String("error", err.Error()),
+			)
 		}
 	}
 
-	//Pre-router middlewares
-	e.Pre(middleware.CSRF())
-
-	e.Pre(middleware.Secure())
-
-	e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins:                             cfg.AllowedOrigins,
-		AllowCredentials:                         true,
-		UnsafeWildcardOriginWithAllowCredentials: cfg.AppEnv != config.EnvProduction,
-	}))
-
-	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
-		Root:       "public",
-		Filesystem: http.FS(assets.FS),
-	}))
-
-	e.Pre(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
-		Generator: ulid.Make().String,
-	}))
-
-	e.Pre(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
-		LogRequestID:    true,
-		LogRemoteIP:     true,
-		LogProtocol:     true,
-		LogURI:          true,
-		LogMethod:       true,
-		LogStatus:       true,
-		LogLatency:      true,
-		LogResponseSize: true,
-		LogReferer:      true,
-		LogUserAgent:    true,
-		LogError:        true,
-		LogHost:         true,
-		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			status := v.Status
-			var errStr string
-			if httpErr, ok := v.Error.(*echo.HTTPError); ok {
-				if httpErr.Code == http.StatusInternalServerError {
-					errStr = httpErr.Error()
+	recoverPanic := func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) (err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					c.Set("panicReason", r)
+					c.Set("panicStack", string(debug.Stack()))
+					err = echo.NewHTTPError(http.StatusInternalServerError)
 				}
-			} else if v.Error != nil {
-				// Due to a bug in echo, when the error is not an echo.HTTPError, even though the status code sent is 500, it's logged as 200 in this middleware.
-				// We need to manually set the status code in the log to 500.
-				status = http.StatusInternalServerError
-			}
+			}()
 
-			var userID string
-			if user, ok := c.Get("user").(*repository.User); ok && (user != nil) {
-				userID = user.ID.String()
-			}
+			err = next(c)
+			return
+		}
+	}
 
-			attrs := []any{
-				slog.String("id", v.RequestID),
-				slog.String("client_ip", v.RemoteIP),
-				slog.String("protocol", v.Protocol),
-				slog.String("uri", v.URI),
-				slog.String("method", v.Method),
-				slog.Int64("duration_ms", v.Latency.Milliseconds()),
-				slog.Int64("res_bytes", v.ResponseSize),
-				slog.Int("status", status),
-			}
-			if v.Host != "" {
-				attrs = append(attrs, slog.String("host", v.Host))
-			}
-			if v.UserAgent != "" {
-				attrs = append(attrs, slog.String("user_agent", v.UserAgent))
-			}
-			if v.Referer != "" {
-				attrs = append(attrs, slog.String("referer", v.Referer))
-			}
-			if userID != "" {
-				attrs = append(attrs, slog.String("user_id", userID))
-			}
-			if errStr != "" {
-				attrs = append(attrs, slog.String("error", errStr))
-			}
+	e.Pre(middleware.NormalizePath())
 
-			slog.Info("HTTP request", attrs...)
-			return nil
-		},
-	}))
+	e.Use(
+		// logging
+		middleware.LogRequest(h.Logger),
 
-	e.Pre(middleware.RemoveTrailingSlash())
+		// safety net
+		recoverPanic,
 
-	//Post-router middlewares
-	sessionStore := sessions.NewCookieStore([]byte("auth-secret"))
-	e.Use(session.Middleware(sessionStore))
+		// security
+		echomiddleware.Secure(),
+		echomiddleware.CORSWithConfig(echomiddleware.CORSConfig{
+			AllowOrigins:     cfg.AllowedOrigins,
+			AllowCredentials: true,
+			MaxAge:           60,
+		}),
 
-	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{
-		Skipper: func(c echo.Context) bool {
-			return !strings.Contains(c.Request().Header.Get("Accept-Encoding"), "gzip") || strings.HasPrefix(c.Path(), "/metrics")
-		},
-	}))
+		// request/response processing
+		echomiddleware.Decompress(),
+		echomiddleware.BodyLimit("4MB"),
+		echomiddleware.Gzip(),
 
-	e.Use(middleware.Decompress())
+		// infra
+		echomiddleware.TimeoutWithConfig(echomiddleware.TimeoutConfig{
+			Timeout: time.Second * 10,
+			Skipper: func(c echo.Context) bool {
+				return strings.HasPrefix(c.Path(), "/debug/pprof")
+			},
+		}),
 
-	e.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
-		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
-			slog.Error("http handler panic", slog.String("id", c.Response().Header().Get(echo.HeaderXRequestID)), slog.String("error", err.Error()), slog.String("stack", string(stack)))
-			return nil
-		}},
-	))
+		// i18n
+		middleware.ResolveLanguage(),
 
-	// This middleware causes data races, but it's not a big deal. See https://github.com/labstack/echo/issues/1761
-	e.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
-		Timeout: time.Minute,
-		Skipper: func(c echo.Context) bool {
-			return strings.HasPrefix(c.Path(), "/debug/pprof")
-		},
-	}))
+		// sessions
+		session.Middleware(sessions.NewCookieStore([]byte(cfg.SessionSecret))),
 
-	e.Use(echoprometheus.NewMiddleware("api"))
+		// metrics
+		echoprometheus.NewMiddleware("api"),
+
+		// static files
+		echomiddleware.StaticWithConfig(echomiddleware.StaticConfig{
+			Filesystem: http.FS(assets.FS),
+			Root:       "/public",
+		}),
+	)
 
 	pprof.Register(e)
 

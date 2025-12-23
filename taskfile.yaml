@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://taskfile.dev/schema.json
-version: '3'
+version: "3"
 
 run: once
 
@@ -24,11 +24,10 @@ vars:
     sh: path=".tmp" && mkdir -p "$path" && echo "$path"
   # The file path used to store the built binary of the go project.
   BINARY_PATH: "{{.TMP_DIR}}/main.exe"
-  # The file path used to store the test coverage report.
-  TEST_COVERAGE_PATH: "{{.TMP_DIR}}/test-coverage.out"
   # The directory used to store all the database migration scripts.
   MIGRATIONS_DIR: database/migrations
   BASE_IMAGE_TAG: "{{.GO_VERSION}}-alpine3.22"
+  TASKFILE_VERSION: "v3.46.1"
 
 dotenv:
   - .env
@@ -36,9 +35,9 @@ dotenv:
 env:
   BASE_IMAGE_TAG: "{{.BASE_IMAGE_TAG}}"
   TMP_DIR: "{{.TMP_DIR}}"
+  TASKFILE_VERSION: "{{.TASKFILE_VERSION}}"
 
 tasks:
-
   # ----------------------------
   # Miscellaneous
   # ----------------------------
@@ -95,14 +94,14 @@ tasks:
     deps:
       - init
     cmds:
-      - sqlc generate
+      - sqlc generate -f database/sqlc.yaml
     sources:
       - database/migrations/**/*
       - database/queries/**/*
-      - sqlc.yaml
+      - database/sqlc.yaml
     generates:
       - database/repository/**/*
-    internal: true
+    # internal: true
 
   # ----------------------------
   # Build tasks
@@ -113,20 +112,20 @@ tasks:
     deps:
       - sqlc:gen
     vars:
-      BUILD_INFO: |
+      BUILD_INFO: >
         {
           "app_name":"{{.APP_NAME}}",
           "app_version":"{{.APP_VERSION}}",
           "build_type":"{{.BUILD_TYPE}}",
           "build_timestamp":"{{.CURRENT_TIMESTAMP}}"
         }
-      LDFLAGS: "{{.LDFLAGS}} -X {{.MODULE_NAME}}/config.BuildInfoBase64={{.BUILD_INFO | b64enc}}"
-      FLAGS: "{{.FLAGS}} -o {{.BINARY_PATH}}"
-    requires:
-      vars:
-        - BUILD_TYPE
     cmds:
-    - go build -ldflags="{{.LDFLAGS}}" {{.FLAGS}} cmd/app/main.go
+      - >
+        go build
+        -ldflags="{{if eq .BUILD_TYPE "release"}}-s -w -extldflags=-static{{end}} -X {{.MODULE_NAME}}/deps/config.BuildInfoBase64={{.BUILD_INFO | b64enc}}"
+        {{if eq .BUILD_TYPE "release"}}-trimpath{{end}}
+        -o {{.BINARY_PATH}}
+        cmd/app/main.go
     internal: true
 
   build:debug:
@@ -143,12 +142,12 @@ tasks:
         vars:
           BUILD_TYPE: release
           LDFLAGS: -s -w -extldflags=-static
-          FLAGS: -trimpath
 
   docker:build:release:
     desc: Build the docker image of the application for production release.
     vars:
       IMAGE_TAG: "{{.APP_NAME}}:{{.APP_VERSION}}"
+      DOCKERFILE_PATH: ./deploy/docker/Dockerfile
     cmds:
       - docker rmi -f "{{.IMAGE_TAG}}" || true
       - docker image prune -f
@@ -158,7 +157,9 @@ tasks:
         --tag "{{.IMAGE_TAG}}"
         --target "release"
         --build-arg BASE_IMAGE_TAG="{{.BASE_IMAGE_TAG}}"
+        --build-arg TASKFILE_VERSION="{{.TASKFILE_VERSION}}"
         --build-arg BINARY_PATH="{{.BINARY_PATH}}"
+        --file {{.DOCKERFILE_PATH}}
         .
 
   # ----------------------------
@@ -174,7 +175,6 @@ tasks:
     generates:
       - "{{.TMP_DIR}}/localhost.crt"
       - "{{.TMP_DIR}}/localhost.key"
-    internal: true
 
   run:debug:
     desc: Run the application using the debug build.
@@ -204,6 +204,7 @@ tasks:
       - init
       - devcerts:gen
     cmds:
+      # OS signals are not forwarded to app when using air inside Taskfile so graceful shutdown won't happen during development.
       - >
         air
         --tmp_dir {{.TMP_DIR}}
@@ -218,28 +219,24 @@ tasks:
   docker:dev:
     desc: Run development server with live reloading & external dependencies in Docker using docker compose.
     vars:
-      COMPOSE_PATH: compose.dev.yaml
+      COMPOSE_PATH: ./deploy/compose/compose.dev.yaml
     cmds:
       - docker compose -f "{{.COMPOSE_PATH}}" down --remove-orphans
       - docker compose -f "{{.COMPOSE_PATH}}" rm --force
       - docker compose -f "{{.COMPOSE_PATH}}" up --build
-
+    interactive: true
   # ----------------------------
   # Testing & Benchmarking
   # ----------------------------
 
   test:
-    desc: Run all tests and generate coverage report.
+    desc: Run all tests and generate coverage report.\
+    vars:
+      TEST_COVERAGE_PATH_RAW: "{{.TMP_DIR}}/test-coverage.out"
+      TEST_COVERAGE_PATH_HTML: "{{.TMP_DIR}}/test-coverage.html"
     cmds:
-      - go test -count=2 -v -covermode=atomic -coverprofile={{.TEST_COVERAGE_PATH}} ./...
-      - go tool cover -func={{.TEST_COVERAGE_PATH}}
-
-  test:view:
-    desc: View coverage report in browser.
-    deps:
-      - test
-    cmds:
-      - go tool cover -html={{.TEST_COVERAGE_PATH}}
+      - go test -count=2 -v -covermode=atomic -coverprofile={{.TEST_COVERAGE_PATH_RAW}} ./...
+      - go tool cover -html={{.TEST_COVERAGE_PATH_RAW}} -o {{.TEST_COVERAGE_PATH_HTML}}
 
   benchmark:
     desc: Run all benchmarks.

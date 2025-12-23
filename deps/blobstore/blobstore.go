@@ -1,16 +1,17 @@
-// Package blobstore provides a wrapper around S3 client.
-package application
+package blobstore
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 var (
@@ -129,4 +130,38 @@ func (s *BlobStore) List(ctx context.Context, p *BlobListParams) ([]FileMetaData
 		token = objects.NextContinuationToken
 	}
 	return files, nil
+}
+
+type SeqValue[T any] struct {
+	Data T
+	Err  error
+}
+
+func S3Objects(ctx context.Context, client *s3.Client, bucket string) iter.Seq[SeqValue[types.Object]] {
+	return func(yield func(SeqValue[types.Object]) bool) {
+		var token *string
+
+		for {
+			res, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+				Bucket:            &bucket,
+				ContinuationToken: token,
+			})
+			if err != nil {
+				yield(SeqValue[types.Object]{Err: err})
+				return
+			}
+
+			for _, obj := range res.Contents {
+				if !yield(SeqValue[types.Object]{Data: obj}) {
+					return
+				}
+			}
+
+			if res.IsTruncated != nil && !*res.IsTruncated {
+				break
+			}
+
+			token = res.NextContinuationToken
+		}
+	}
 }

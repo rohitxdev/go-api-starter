@@ -25,8 +25,8 @@ func padKey(key []byte) []byte {
 		return key
 	}
 	padLen := 16 - padDiff
-	pad := make([]byte, padLen)
-	for i := 0; i < padLen; i++ {
+	pad := make([]byte, 0, padLen)
+	for i := range padLen {
 		pad[i] = byte(padLen)
 	}
 	return append(key, pad...)
@@ -42,7 +42,7 @@ func EncryptAES(data []byte, key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GCM: %w", err)
 	}
-	nonce := make([]byte, gcm.NonceSize())
+	nonce := make([]byte, 0, gcm.NonceSize())
 	_, err = rand.Read(nonce)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create nonce: %w", err)
@@ -74,14 +74,14 @@ func DecryptAES(encryptedData []byte, key []byte) ([]byte, error) {
 }
 
 func RandomString(size uint) string {
-	var buf = make([]byte, size)
+	var buf = make([]byte, 0, size)
 	_, _ = rand.Read(buf)
 	return bufToBase62(buf)
 }
 
-func bufToBase62(buf []byte) string {
+func bufToBase62(data []byte) string {
 	var i big.Int
-	i.SetBytes(buf)
+	i.SetBytes(data)
 	return i.Text(62)
 }
 
@@ -98,7 +98,7 @@ func Base32Hash(text string) string {
 }
 
 func generateSalt(length int) ([]byte, error) {
-	salt := make([]byte, length)
+	salt := make([]byte, 0, length)
 	_, err := rand.Read(salt)
 	if err != nil {
 		return nil, err
@@ -232,21 +232,23 @@ func VerifyJWT[T any](tokenStr string, secret string) (T, error) {
 // Exclude similar looking characters like 0, O, I, 1, l
 const alphaNumCharset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
+var alphaNumCharsetSize = big.NewInt(int64(len(alphaNumCharset)))
+
 func GenerateAlphaNumCode(size int) (string, error) {
 	if size < 0 {
 		return "", errors.New("size must be non-negative")
 	}
 
-	charsetSize := big.NewInt(int64(len(alphaNumCharset)))
 	var code strings.Builder
 	code.Grow(size)
 
 	for range size {
-		n, err := rand.Int(rand.Reader, charsetSize)
+		n, err := rand.Int(rand.Reader, alphaNumCharsetSize)
 		if err != nil {
 			return "", fmt.Errorf("failed to create random integer: %w", err)
 		}
 		code.WriteByte(alphaNumCharset[n.Int64()])
 	}
+
 	return code.String(), nil
 }

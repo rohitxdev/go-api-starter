@@ -9,32 +9,50 @@ services:
     ports:
       - 5432:5432
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.35.1
+    container_name: dragonfly
+    ports:
+      - 6379:6379
+    ulimits:
+      memlock: -1
+    volumes:
+      - dragonfly_data:/data
+    command:
+      - --dir=/data
+      - --dbfilename=dump
+
   api:
     depends_on:
       - postgres
+      - dragonfly
     build:
-      context: .
-      dockerfile: ./Dockerfile
+      context: ../../
+      dockerfile: ./deploy/docker/Dockerfile
       target: development
       args:
         BASE_IMAGE_TAG: ${BASE_IMAGE_TAG}
+        TASKFILE_VERSION: ${TASKFILE_VERSION}
     container_name: api
     environment:
       POSTGRES_URL: postgresql://postgres:postgres@postgres:5432/main
+      REDIS_URL: redis://dragonfly:6379/0
       HTTP_HOST: 0.0.0.0
     ports:
       - ${HTTP_PORT}:${HTTP_PORT}
     volumes:
-      - .:/app
+      - ../../:/app
       - task_dir:/app/.task
       - tmp_dir:/app/.tmp
 volumes:
   postgres_data:
+  dragonfly_data:
   task_dir:
   tmp_dir:
