@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"runtime"
 	"time"
 
 	"github.com/allegro/bigcache"
@@ -14,9 +13,13 @@ type Cache[T any] struct {
 	sf singleflight.Group
 }
 
+const (
+	shardCount = 64
+)
+
 func New[T any](expiry time.Duration) (*Cache[T], error) {
 	bc, err := bigcache.NewBigCache(bigcache.Config{
-		Shards:      runtime.NumCPU() * 16,
+		Shards:      shardCount,
 		LifeWindow:  expiry,
 		CleanWindow: expiry / 10,
 	})
