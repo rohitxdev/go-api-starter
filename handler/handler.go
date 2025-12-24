@@ -34,7 +34,7 @@ const (
 
 type Dependencies struct {
 	BlobStore *blobstore.BlobStore
-	Config    *config.Config
+	Config    *config.Store
 	Cache     *cache.Cache[string]
 	Email     *email.Client
 	Logger    *slog.Logger
@@ -88,8 +88,8 @@ func (c *countingReadCloser) Close() error {
 }
 
 func New(deps *Dependencies) (*echo.Echo, error) {
-	cfg := deps.Config
 	h := Handler{Dependencies: deps}
+	cfg := h.Config.Get()
 
 	e := echo.New()
 	e.JSONSerializer = JSONSerializer{}

@@ -8,9 +8,10 @@ import (
 )
 
 func (h *Handler) Home(c echo.Context) error {
+	cfg := h.Config.Get()
 	return c.Render(http.StatusOK, "home", echo.Map{
-		"appName":    h.Config.AppName,
-		"appVersion": h.Config.AppVersion,
+		"appName":    cfg.AppName,
+		"appVersion": cfg.AppVersion,
 	})
 }
 
@@ -34,11 +35,13 @@ func (h *Handler) GetConfig(c echo.Context) error {
 		BuildType  string `json:"build_type"`
 	}
 
+	cfg := h.Config.Get()
+
 	return c.JSON(http.StatusOK, APISuccessResponse{
 		Data: clientConfig{
-			AppName:    h.Config.AppName,
-			AppVersion: h.Config.AppVersion,
-			BuildType:  h.Config.BuildType,
+			AppName:    cfg.AppName,
+			AppVersion: cfg.AppVersion,
+			BuildType:  cfg.BuildType,
 		},
 	})
 }

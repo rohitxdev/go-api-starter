@@ -40,11 +40,12 @@ func run() error {
 	slog.SetDefault(logger)
 
 	// Config
-	cfg, err := config.Load()
+	configStore, err := config.NewStore()
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return fmt.Errorf("failed to create config store: %w", err)
 	}
 
+	cfg := configStore.Get()
 	if cfg.Debug {
 		level.Set(slog.LevelDebug)
 	}
@@ -84,7 +85,7 @@ func run() error {
 	logger.Info("connected to redis server")
 
 	deps := handler.Dependencies{
-		Config: cfg,
+		Config: configStore,
 		Cache:  cache,
 		Redis:  rdb,
 		Repo:   repo,
@@ -107,8 +108,8 @@ func run() error {
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,
 		IdleTimeout:  time.Minute,
-		ConnState: func(c net.Conn, cs http.ConnState) {
-			logger.Debug("HTTP connection state changed", "client_ip", c.RemoteAddr().String(), "state", cs.String())
+		ConnState: func(c net.Conn, configStore http.ConnState) {
+			logger.Debug("HTTP connection state changed", "client_ip", c.RemoteAddr().String(), "state", configStore.String())
 		},
 	}
 
