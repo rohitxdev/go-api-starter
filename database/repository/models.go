@@ -5,8 +5,6 @@
 package repository
 
 import (
-	"net/netip"
-
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -26,16 +24,6 @@ type Otp struct {
 	ExpiresAt  pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
-type Session struct {
-	ID        pgtype.UUID        `db:"id" json:"id"`
-	UserID    pgtype.UUID        `db:"user_id" json:"user_id"`
-	UserAgent *string            `db:"user_agent" json:"user_agent"`
-	IpAddress netip.Addr         `db:"ip_address" json:"ip_address"`
-	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type Subscription struct {

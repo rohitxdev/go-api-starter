@@ -1,8 +1,8 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
-	"net/netip"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -20,7 +20,6 @@ func (h *Handler) SendAuthOTP(c echo.Context) error {
 		return err
 	}
 
-	req.Email = canonicalizeEmail(req.Email)
 	code, err := util.GenerateAlphaNumCode(6)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, APIErrorResponse{
@@ -106,22 +105,13 @@ func (h *Handler) VerifyAuthOTP(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to update user").SetInternal(err)
 	}
 
-	ipAddress, err := netip.ParseAddr(c.RealIP())
+	sessionId, err := util.RandomString(32)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to parse client IP address").SetInternal(err)
+		return fmt.Errorf("failed to generate session id: %w", err)
 	}
 
-	sessionId, err := h.Repo.CreateSession(
-		c.Request().Context(),
-		repository.CreateSessionParams{
-			UserID: otp.UserID,
-			ExpiresAt: pgtype.Timestamptz{
-				Time:  time.Now().Add(time.Hour * 24 * 30),
-				Valid: true,
-			},
-			IpAddress: ipAddress,
-		})
-	if err != nil {
+	cmd := h.Redis.Set(c.Request().Context(), "session:"+sessionId, otp.UserID, time.Duration(time.Hour*24*30))
+	if cmd.Err() != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create session entity").SetInternal(err)
 	}
 
@@ -130,7 +120,6 @@ func (h *Handler) VerifyAuthOTP(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get session").SetInternal(err)
 	}
 
-	sess.Values["sessionID"] = sessionId.String()
 	if err = sess.Save(c.Request(), c.Response()); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to save session").SetInternal(err)
 	}

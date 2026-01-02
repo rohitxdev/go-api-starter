@@ -40,9 +40,10 @@ type Runtime struct {
 }
 
 type Secrets struct {
-	PostgresURL   string `json:"postgres_url" validate:"required,url" env:"POSTGRES_URL"`
-	RedisURL      string `json:"redis_url" validate:"required,url" env:"REDIS_URL"`
-	SessionSecret string `json:"session_secret" validate:"required,len=64" env:"SESSION_SECRET"`
+	PostgresURL    string `json:"postgres_url" validate:"required,url" env:"POSTGRES_URL"`
+	RedisURL       string `json:"redis_url" validate:"required,url" env:"REDIS_URL"`
+	SessionSecret  string `json:"session_secret" validate:"required,len=64" env:"SESSION_SECRET"`
+	DeviceIDSecret string `json:"device_id_secret" validate:"required,len=64" env:"DEVICE_ID_SECRET"`
 }
 
 type Features struct {

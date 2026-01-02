@@ -4,7 +4,7 @@ VALUES ($1 , $2)
 RETURNING *;
 
 -- name: GetUserByID :one
-SELECT id, username
+SELECT *
 FROM users
 WHERE id = $1;
 

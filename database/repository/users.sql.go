@@ -74,20 +74,22 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*GetUserByE
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username
+SELECT id, username, email, verified_at, created_at, updated_at
 FROM users
 WHERE id = $1
 `
 
-type GetUserByIDRow struct {
-	ID       pgtype.UUID `db:"id" json:"id"`
-	Username *string     `db:"username" json:"username"`
-}
-
-func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (*GetUserByIDRow, error) {
+func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (*User, error) {
 	row := q.db.QueryRow(ctx, getUserByID, id)
-	var i GetUserByIDRow
-	err := row.Scan(&i.ID, &i.Username)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.VerifiedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
 	return &i, err
 }
 

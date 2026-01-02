@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"text/template"
 
 	"github.com/bytedance/sonic"
@@ -42,9 +41,9 @@ func (v requestValidator) Validate(i any) error {
 }
 
 // Custom JSON serializer & deserializer
-type JSONSerializer struct{}
+type jsonSerializer struct{}
 
-func (s JSONSerializer) Serialize(c echo.Context, data any, indent string) error {
+func (s jsonSerializer) Serialize(c echo.Context, data any, indent string) error {
 	var (
 		buf []byte
 		err error
@@ -64,7 +63,7 @@ func (s JSONSerializer) Serialize(c echo.Context, data any, indent string) error
 	return err
 }
 
-func (s JSONSerializer) Deserialize(c echo.Context, v any) error {
+func (s jsonSerializer) Deserialize(c echo.Context, v any) error {
 	body, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		return err
@@ -99,17 +98,4 @@ func bindAndValidate(c echo.Context, i any) error {
 	}
 
 	return nil
-}
-
-func canonicalizeEmail(email string) string {
-	email = strings.TrimSpace(email)
-	email = strings.ToLower(email)
-	parts := strings.Split(email, "@")
-	username := parts[0]
-	domain := parts[1]
-	if strings.Contains(username, "+") {
-		username = strings.Split(username, "+")[0]
-	}
-	username = strings.ReplaceAll(username, ".", "")
-	return username + "@" + domain
 }

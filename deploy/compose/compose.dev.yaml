@@ -16,23 +16,20 @@ services:
       timeout: 5s
       retries: 5
 
-  dragonfly:
-    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.35.1
-    container_name: dragonfly
+  redis:
+    image: redis:latest
+    container_name: redis
     ports:
       - 6379:6379
     ulimits:
       memlock: -1
     volumes:
-      - dragonfly_data:/data
-    command:
-      - --dir=/data
-      - --dbfilename=dump
+      - redis_data:/data
 
   api:
     depends_on:
       - postgres
-      - dragonfly
+      - redis
     build:
       context: ../../
       dockerfile: ./deploy/docker/Dockerfile
@@ -43,7 +40,7 @@ services:
     container_name: api
     environment:
       POSTGRES_URL: postgresql://postgres:postgres@postgres:5432/main
-      REDIS_URL: redis://dragonfly:6379/0
+      REDIS_URL: redis://redis:6379/0
       HTTP_HOST: 0.0.0.0
     ports:
       - ${HTTP_PORT}:${HTTP_PORT}
@@ -53,6 +50,6 @@ services:
       - tmp_dir:/app/.tmp
 volumes:
   postgres_data:
-  dragonfly_data:
+  redis_data:
   task_dir:
   tmp_dir:

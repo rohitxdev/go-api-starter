@@ -13,7 +13,6 @@ import (
 
 type Querier interface {
 	CreateOtp(ctx context.Context, arg CreateOtpParams) error
-	CreateSession(ctx context.Context, arg CreateSessionParams) (pgtype.UUID, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (*User, error)
 	DeleteOtp(ctx context.Context, id pgtype.UUID) error
 	DeleteUser(ctx context.Context, id pgtype.UUID) (pgconn.CommandTag, error)
@@ -21,8 +20,7 @@ type Querier interface {
 	GetSubscriptionByAccountID(ctx context.Context, accountID pgtype.UUID) (*Subscription, error)
 	GetUserAccountsByUserID(ctx context.Context, userID pgtype.UUID) ([]*Account, error)
 	GetUserByEmail(ctx context.Context, email string) (*GetUserByEmailRow, error)
-	GetUserByID(ctx context.Context, id pgtype.UUID) (*GetUserByIDRow, error)
-	GetUserBySessionId(ctx context.Context, sessionID pgtype.UUID) (*User, error)
+	GetUserByID(ctx context.Context, id pgtype.UUID) (*User, error)
 	IncrementOtpAttempts(ctx context.Context, userID pgtype.UUID) error
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]*ListUsersRow, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (*User, error)

@@ -7,12 +7,15 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/oklog/ulid/v2"
-	"github.com/rohitxdev/go-api/database/repository"
 )
 
 const (
 	HeaderXClientID = "X-Client-ID"
 	HeaderXTraceID  = "X-Trace-ID"
+)
+
+const (
+	CtxKeyTraceID = "trace_id"
 )
 
 type countingReadCloser struct {
@@ -34,7 +37,7 @@ func LogRequest(logger *slog.Logger) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			traceID := ulid.Make().String()
-			c.Set("traceID", traceID)
+			c.Set(CtxKeyTraceID, traceID)
 
 			req := c.Request()
 			// Hijack request body to count bytes read without copying the body
@@ -91,8 +94,8 @@ func LogRequest(logger *slog.Logger) echo.MiddlewareFunc {
 				attrs = append(attrs, slog.String("client_id", clientID))
 			}
 
-			if user, ok := c.Get("user").(*repository.User); ok && (user != nil) {
-				attrs = append(attrs, slog.String("user_id", user.ID.String()))
+			if idKey, ok := c.Get(CtxKeyIDKey).(string); ok && (idKey != "") {
+				attrs = append(attrs, slog.String("id_key", idKey))
 			}
 
 			logger.Info("HTTP Request", attrs...)

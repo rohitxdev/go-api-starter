@@ -1,40 +1,44 @@
 package handlerutil
 
 import (
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/rohitxdev/go-api/database/repository"
 )
 
+/*
+1. UserId
+2. DeviceId
+3. IpAddress
+*/
+
+const (
+	CtxKeyUserID = "user_id"
+	CtxKeyUser   = "user"
+)
+
 func CurrentUser(c echo.Context, repo repository.Querier) *repository.User {
-	user, ok := c.Get("user").(*repository.User)
+	user, ok := c.Get(CtxKeyUser).(*repository.User)
 	if ok {
 		return user
 	}
 
-	sess, err := session.Get("session", c)
-	if err != nil {
-		return nil
-	}
-
-	sesssionIDStr, ok := sess.Values["sessionID"].(string)
+	userID, ok := c.Get(CtxKeyUserID).(string)
 	if !ok {
 		return nil
 	}
 
-	sessionID, err := uuid.Parse(sesssionIDStr)
+	var id pgtype.UUID
+	if err := id.Scan(userID); err != nil {
+		return nil
+	}
+
+	user, err := repo.GetUserByID(c.Request().Context(), id)
 	if err != nil {
 		return nil
 	}
 
-	user, err = repo.GetUserBySessionId(c.Request().Context(), pgtype.UUID{Bytes: sessionID, Valid: true})
-	if err != nil {
-		return nil
-	}
-
-	c.Set("user", user)
+	c.Set(CtxKeyUser, user)
 
 	return user
 }

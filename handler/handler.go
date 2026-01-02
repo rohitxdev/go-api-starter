@@ -5,11 +5,11 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"runtime/debug"
 	"strings"
 	"text/template"
 	"time"
 
+	"github.com/go-redis/redis_rate/v10"
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo-contrib/pprof"
@@ -33,22 +33,23 @@ const (
 )
 
 type Dependencies struct {
-	BlobStore *blobstore.BlobStore
-	Config    *config.Store
-	Cache     *cache.Cache[string]
-	Email     *email.Client
-	Logger    *slog.Logger
-	Redis     *redis.Client
-	Repo      *repository.Queries
+	BlobStore   *blobstore.BlobStore
+	Config      *config.Store
+	Cache       *cache.Cache[string]
+	Email       *email.Client
+	Logger      *slog.Logger
+	Redis       *redis.Client
+	Repo        *repository.Queries
+	RateLimiter *redis_rate.Limiter
 }
 
 type Handler struct {
 	*Dependencies
 }
 
-func registerRoutes(e *echo.Echo, h *Handler) {
+func registerV1Routes(e *echo.Group, h *Handler) {
+	e.GET("/bootstrap", h.Bootstrap)
 	e.GET("/metrics", echoprometheus.NewHandler())
-	e.GET("/config", h.GetConfig)
 
 	e.GET("/", func(c echo.Context) error {
 		return c.Redirect(http.StatusTemporaryRedirect, "/views/home")
@@ -64,11 +65,6 @@ func registerRoutes(e *echo.Echo, h *Handler) {
 		auth.POST("/otp/send", h.SendAuthOTP)
 		auth.POST("/otp/verify", h.VerifyAuthOTP)
 		auth.POST("/sign-out", h.SignOut)
-	}
-
-	users := e.Group("/users")
-	{
-		users.GET("/me", h.GetMe)
 	}
 }
 
@@ -87,30 +83,8 @@ func (c *countingReadCloser) Close() error {
 	return c.rc.Close()
 }
 
-func New(deps *Dependencies) (*echo.Echo, error) {
-	h := Handler{Dependencies: deps}
-	cfg := h.Config.Get()
-
-	e := echo.New()
-	e.JSONSerializer = JSONSerializer{}
-	e.Validator = requestValidator{
-		validator: util.Validate,
-	}
-	e.IPExtractor = echo.ExtractIPFromXFFHeader(
-		echo.TrustLoopback(false),   // e.g. ipv4 start with 127.
-		echo.TrustLinkLocal(false),  // e.g. ipv4 start with 169.254
-		echo.TrustPrivateNet(false), // e.g. ipv4 start with 10. or 192.168
-	)
-
-	pageTemplates, err := template.ParseFS(assets.FS, "templates/pages/*.tmpl")
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse templates: %w", err)
-	}
-	e.Renderer = viewRenderer{
-		templates: pageTemplates,
-	}
-
-	e.HTTPErrorHandler = func(err error, c echo.Context) {
+func handleHTTPError(logger *slog.Logger) echo.HTTPErrorHandler {
+	return func(err error, c echo.Context) {
 		var (
 			traceID     string
 			panicReason any
@@ -119,13 +93,13 @@ func New(deps *Dependencies) (*echo.Echo, error) {
 			msg         = http.StatusText(status)
 		)
 
-		if v, ok := c.Get("traceID").(string); ok {
+		if v, ok := c.Get(middleware.CtxKeyTraceID).(string); ok {
 			traceID = v
 		}
-		if v := c.Get("panicReason"); v != nil {
+		if v := c.Get(middleware.CtxKeyPanicReason); v != nil {
 			panicReason = v
 		}
-		if v, ok := c.Get("panicStack").(string); ok {
+		if v, ok := c.Get(middleware.CtxKeyPanicStack).(string); ok {
 			panicStack = v
 		}
 
@@ -156,54 +130,68 @@ func New(deps *Dependencies) (*echo.Echo, error) {
 		}
 
 		if status == http.StatusInternalServerError {
-			h.Logger.Error(msg, attrs...)
+			msg = echo.ErrInternalServerError.Message.(string)
+			logger.Error(msg, attrs...)
 		}
 
 		if err := c.JSON(status, APIErrorResponse{Error: msg}); err != nil {
-			h.Logger.Error("failed to send response",
+			logger.Error("failed to send response",
 				slog.String("trace_id", traceID),
 				slog.String("error", err.Error()),
 			)
 		}
 	}
+}
 
-	recoverPanic := func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) (err error) {
-			defer func() {
-				if r := recover(); r != nil {
-					c.Set("panicReason", r)
-					c.Set("panicStack", string(debug.Stack()))
-					err = echo.NewHTTPError(http.StatusInternalServerError)
-				}
-			}()
+func New(deps *Dependencies) (*echo.Echo, error) {
+	h := Handler{Dependencies: deps}
+	h.RateLimiter = redis_rate.NewLimiter(h.Redis)
 
-			err = next(c)
-			return
-		}
+	cfg := h.Config.Get()
+
+	e := echo.New()
+
+	pageTemplates, err := template.ParseFS(assets.FS, "templates/pages/*.tmpl")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse templates: %w", err)
 	}
+
+	e.Renderer = viewRenderer{
+		templates: pageTemplates,
+	}
+
+	e.JSONSerializer = jsonSerializer{}
+	e.Validator = requestValidator{
+		validator: util.Validate,
+	}
+	e.IPExtractor = echo.ExtractIPFromXFFHeader(
+		echo.TrustLoopback(false),   // e.g. ipv4 start with 127.
+		echo.TrustLinkLocal(false),  // e.g. ipv4 start with 169.254
+		echo.TrustPrivateNet(false), // e.g. ipv4 start with 10. or 192.168
+	)
+	e.HTTPErrorHandler = handleHTTPError(h.Logger)
 
 	e.Pre(middleware.NormalizePath())
 
 	e.Use(
 		// logging
 		middleware.LogRequest(h.Logger),
-
 		// safety net
-		recoverPanic,
-
+		middleware.RecoverPanic(),
+		// identity
+		middleware.ResolveIdentityKey(h.Redis, h.Config),
 		// security
+		middleware.RateLimit(h.RateLimiter, redis_rate.PerMinute(100)),
 		echomiddleware.Secure(),
 		echomiddleware.CORSWithConfig(echomiddleware.CORSConfig{
 			AllowOrigins:     cfg.AllowedOrigins,
 			AllowCredentials: true,
 			MaxAge:           60,
 		}),
-
 		// request/response processing
 		echomiddleware.Decompress(),
 		echomiddleware.BodyLimit("4MB"),
 		echomiddleware.Gzip(),
-
 		// infra
 		echomiddleware.TimeoutWithConfig(echomiddleware.TimeoutConfig{
 			Timeout: time.Second * 10,
@@ -211,16 +199,12 @@ func New(deps *Dependencies) (*echo.Echo, error) {
 				return strings.HasPrefix(c.Path(), "/debug/pprof")
 			},
 		}),
-
 		// i18n
 		middleware.ResolveLanguage(),
-
 		// sessions
 		session.Middleware(sessions.NewCookieStore([]byte(cfg.SessionSecret))),
-
 		// metrics
 		echoprometheus.NewMiddleware("api"),
-
 		// static files
 		echomiddleware.StaticWithConfig(echomiddleware.StaticConfig{
 			Filesystem: http.FS(assets.FS),
@@ -230,7 +214,7 @@ func New(deps *Dependencies) (*echo.Echo, error) {
 
 	pprof.Register(e)
 
-	registerRoutes(e, &h)
+	registerV1Routes(e.Group("/v1"), &h)
 
 	return e, nil
 }

@@ -10,6 +10,7 @@ require (
 	github.com/bytedance/sonic v1.14.2
 	github.com/caarlos0/env/v11 v11.3.1
 	github.com/go-playground/validator v9.31.0+incompatible
+	github.com/go-redis/redis_rate/v10 v10.0.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/sessions v1.4.0
 	github.com/jackc/pgx/v5 v5.7.6

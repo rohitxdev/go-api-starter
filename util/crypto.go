@@ -3,10 +3,12 @@ package util
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base32"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"math/big"
@@ -73,16 +75,18 @@ func DecryptAES(encryptedData []byte, key []byte) ([]byte, error) {
 	return data, nil
 }
 
-func RandomString(size uint) string {
-	var buf = make([]byte, 0, size)
-	_, _ = rand.Read(buf)
-	return bufToBase62(buf)
-}
-
 func bufToBase62(data []byte) string {
 	var i big.Int
 	i.SetBytes(data)
 	return i.Text(62)
+}
+
+func RandomString(size int) (string, error) {
+	var buf = make([]byte, 0, size)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("failed to read into buffer: %w", err)
+	}
+	return bufToBase62(buf), nil
 }
 
 func Base62Hash(text string) string {
@@ -135,8 +139,8 @@ func VerifySecureHash(data []byte, saltedHash []byte) bool {
 	}
 	salt := saltedHash[:saltLen]
 	hash := saltedHash[saltLen:]
-	computed := hashArgon2(data, salt)
-	return subtle.ConstantTimeCompare(hash, computed) == 1
+	expected := hashArgon2(data, salt)
+	return subtle.ConstantTimeCompare(hash, expected) == 1
 }
 
 func GenerateJWT[T any](data T, expiresIn time.Duration, secret string) (string, error) {
@@ -251,4 +255,15 @@ func GenerateAlphaNumCode(size int) (string, error) {
 	}
 
 	return code.String(), nil
+}
+
+func SignHMAC(message string, secret string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(message))
+	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
+}
+
+func VerifyHMAC(message string, signature string, secret string) bool {
+	expected := SignHMAC(message, secret)
+	return hmac.Equal([]byte(expected), []byte(signature))
 }
