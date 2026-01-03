@@ -86,6 +86,11 @@ tasks:
         echo "Generating pprof profile from $url"
         curl -sSfL --insecure "$url" > default.pgo
 
+  secret:gen:
+    desc: Generate secure, randomly generated secret
+    cmds:
+      - go run cmd/secret/main.go
+
   # ----------------------------
   # SQLC code generation
   # ----------------------------

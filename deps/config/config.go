@@ -31,12 +31,13 @@ type Build struct {
 }
 
 type Runtime struct {
-	AppEnv         Environment `json:"app_env" validate:"required,oneof=testing development staging production" env:"APP_ENV"`
-	TmpDir         string      `json:"tmp_dir" validate:"required,dir" env:"TMP_DIR"`
-	HTTPHost       string      `json:"http_host" validate:"required" env:"HTTP_HOST"`
-	HTTPPort       string      `json:"http_port" validate:"required" env:"HTTP_PORT"`
-	AllowedOrigins []string    `json:"allowed_origins" validate:"required,dive,min=1" env:"ALLOWED_ORIGINS"`
-	Debug          bool        `json:"debug" env:"DEBUG"`
+	AllowedOrigins []string      `json:"allowed_origins" validate:"required,dive,min=1" env:"ALLOWED_ORIGINS"`
+	AppEnv         Environment   `json:"app_env" validate:"required,oneof=testing development staging production" env:"APP_ENV"`
+	TmpDir         string        `json:"tmp_dir" validate:"required,dir" env:"TMP_DIR"`
+	HTTPHost       string        `json:"http_host" validate:"required" env:"HTTP_HOST"`
+	HTTPPort       string        `json:"http_port" validate:"required" env:"HTTP_PORT"`
+	SessionTTL     time.Duration `json:"session_ttl" validate:"required" env:"SESSION_TTL"`
+	Debug          bool          `json:"debug" env:"DEBUG"`
 }
 
 type Secrets struct {
