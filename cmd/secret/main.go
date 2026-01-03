@@ -2,15 +2,13 @@ package main
 
 import (
 	"bufio"
-	"crypto/rand"
-	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/rohitxdev/go-api/util"
 )
 
 func main() {
@@ -48,31 +46,10 @@ func main() {
 		}
 	}
 
-	var byteLen int
-	switch encoding {
-	case "hex":
-		byteLen = int(math.Ceil(float64(charLen) / 2))
-	case "base64url":
-		byteLen = int(math.Ceil(float64(charLen) * 3 / 4))
-	default:
-		log.Fatal("unsupported encoding")
+	secret, err := util.GenerateSecret(prefix, charLen, encoding)
+	if err != nil {
+		log.Fatal(fmt.Errorf("failed to generate secret: %w", err))
 	}
-
-	b := make([]byte, byteLen)
-	if _, err := rand.Read(b); err != nil {
-		log.Fatal(err)
-	}
-
-	var secret string
-	switch encoding {
-	case "hex":
-		secret = hex.EncodeToString(b)
-	case "base64url":
-		secret = base64.RawURLEncoding.EncodeToString(b)
-	}
-
-	secret = prefix + secret
-	secret = secret[:charLen]
 
 	fmt.Printf("\n🔑 Generated secret:\n\t%v\n", secret)
 }

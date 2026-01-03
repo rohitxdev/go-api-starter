@@ -31,13 +31,16 @@ type Build struct {
 }
 
 type Runtime struct {
-	AllowedOrigins []string      `json:"allowed_origins" validate:"required,dive,min=1" env:"ALLOWED_ORIGINS"`
-	AppEnv         Environment   `json:"app_env" validate:"required,oneof=testing development staging production" env:"APP_ENV"`
-	TmpDir         string        `json:"tmp_dir" validate:"required,dir" env:"TMP_DIR"`
-	HTTPHost       string        `json:"http_host" validate:"required" env:"HTTP_HOST"`
-	HTTPPort       string        `json:"http_port" validate:"required" env:"HTTP_PORT"`
-	SessionTTL     time.Duration `json:"session_ttl" validate:"required" env:"SESSION_TTL"`
-	Debug          bool          `json:"debug" env:"DEBUG"`
+	AllowedOrigins      []string      `json:"allowed_origins" validate:"required,dive,min=1" env:"ALLOWED_ORIGINS"`
+	AppEnv              Environment   `json:"app_env" validate:"required,oneof=testing development staging production" env:"APP_ENV"`
+	TmpDir              string        `json:"tmp_dir" validate:"required,dir" env:"TMP_DIR"`
+	HTTPHost            string        `json:"http_host" validate:"required" env:"HTTP_HOST"`
+	HTTPPort            string        `json:"http_port" validate:"required" env:"HTTP_PORT"`
+	EmailFromAddress    string        `json:"email_from_address" env:"EMAIL_FROM_ADDRESS"`
+	EmailFromName       string        `json:"email_from_name" env:"EMAIL_FROM_NAME"`
+	SessionTTL          time.Duration `json:"session_ttl" validate:"required" env:"SESSION_TTL"`
+	VerificationCodeTTL time.Duration `json:"verification_code_ttl" validate:"required" env:"VERIFICATION_CODE_TTL"`
+	Debug               bool          `json:"debug" env:"DEBUG"`
 }
 
 type Secrets struct {
@@ -45,6 +48,10 @@ type Secrets struct {
 	RedisURL       string `json:"redis_url" validate:"required,url" env:"REDIS_URL"`
 	SessionSecret  string `json:"session_secret" validate:"required,len=64" env:"SESSION_SECRET"`
 	DeviceIDSecret string `json:"device_id_secret" validate:"required,len=64" env:"DEVICE_ID_SECRET"`
+	SMTPUsername   string `json:"smtp_username" env:"SMTP_username"`
+	SMTPPassword   string `json:"smtp_password" env:"SMTP_PASSWORD"`
+	SMTPHost       string `json:"smtp_host" env:"SMTP_HOST"`
+	SMTPPort       int    `json:"smtp_port" env:"SMTP_PORT"`
 }
 
 type Features struct {

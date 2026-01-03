@@ -47,24 +47,29 @@ type Handler struct {
 	*Dependencies
 }
 
-func registerV1Routes(e *echo.Group, h *Handler) {
-	e.GET("/bootstrap", h.Bootstrap)
-	e.GET("/metrics", echoprometheus.NewHandler())
-
-	e.GET("/", func(c echo.Context) error {
-		return c.Redirect(http.StatusTemporaryRedirect, "/views/home")
-	})
-
-	views := e.Group("/views")
+func registerV1Routes(e *echo.Echo, h *Handler) {
+	v1 := e.Group("/v1")
 	{
-		views.GET("/home", h.Home)
-	}
+		v1.GET("/bootstrap", h.Bootstrap)
+		v1.GET("/metrics", echoprometheus.NewHandler())
+		v1.GET("/", func(c echo.Context) error {
+			return c.Redirect(http.StatusTemporaryRedirect, "/views/home")
+		})
 
-	auth := e.Group("/auth")
-	{
-		auth.POST("/otp/send", h.SendAuthOTP)
-		auth.POST("/otp/verify", h.VerifyAuthOTP)
-		auth.POST("/sign-out", h.SignOut)
+		views := v1.Group("/views")
+		{
+			views.GET("/home", h.Home)
+		}
+
+		auth := v1.Group("/auth")
+		{
+			signIn := auth.Group("/sign-in")
+			{
+				signIn.POST("/send-code", h.SendSignInVerificationCode)
+				signIn.POST("/verify-code", h.VerifySignIn)
+			}
+			auth.POST("/sign-out", h.SignOut)
+		}
 	}
 }
 
@@ -111,7 +116,6 @@ func handleHTTPError(logger *slog.Logger) echo.HTTPErrorHandler {
 				slog.Any("error", panicReason),
 				slog.String("call_stack", panicStack),
 			)
-
 		} else if httpErr, ok := err.(*echo.HTTPError); ok {
 			switch httpErrMsg := httpErr.Message.(type) {
 			case string:
@@ -127,6 +131,9 @@ func handleHTTPError(logger *slog.Logger) echo.HTTPErrorHandler {
 			}
 
 			status = httpErr.Code
+		} else {
+			status = http.StatusInternalServerError
+			attrs = append(attrs, slog.String("error", err.Error()))
 		}
 
 		if status == http.StatusInternalServerError {
@@ -214,7 +221,7 @@ func New(deps *Dependencies) (*echo.Echo, error) {
 
 	pprof.Register(e)
 
-	registerV1Routes(e.Group("/v1"), &h)
+	registerV1Routes(e, &h)
 
 	return e, nil
 }

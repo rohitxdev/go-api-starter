@@ -15,17 +15,6 @@ type Account struct {
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-type Otp struct {
-	ID         pgtype.UUID        `db:"id" json:"id"`
-	UserID     pgtype.UUID        `db:"user_id" json:"user_id"`
-	CodeHash   []byte             `db:"code_hash" json:"code_hash"`
-	Attempts   int32              `db:"attempts" json:"attempts"`
-	ConsumedAt pgtype.Timestamptz `db:"consumed_at" json:"consumed_at"`
-	ExpiresAt  pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
 type Subscription struct {
 	ID        pgtype.UUID        `db:"id" json:"id"`
 	AccountID pgtype.UUID        `db:"account_id" json:"account_id"`

@@ -32,7 +32,7 @@ func resolveUserFromSession(c echo.Context, rdb *redis.Client) string {
 		return ""
 	}
 
-	sessIDstr, ok := sess.Values["sessionID"].(string)
+	sessIDstr, ok := sess.Values["id"].(string)
 	if !ok {
 		return ""
 	}
@@ -51,8 +51,9 @@ func resolveUserFromSession(c echo.Context, rdb *redis.Client) string {
 }
 
 func resolveDevice(c echo.Context, secret string) string {
-	id := c.Request().Header.Get(HeaderXDeviceID)
-	sig := c.Request().Header.Get(HeaderXDeviceIDSignature)
+	header := c.Request().Header
+	id := header.Get(HeaderXDeviceID)
+	sig := header.Get(HeaderXDeviceIDSignature)
 
 	if id == "" || sig == "" || !util.VerifyHMAC(id, sig, secret) {
 		return ""

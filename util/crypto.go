@@ -9,8 +9,10 @@ import (
 	"crypto/subtle"
 	"encoding/base32"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"reflect"
 	"strings"
@@ -266,4 +268,43 @@ func SignHMAC(message string, secret string) string {
 func VerifyHMAC(message string, signature string, secret string) bool {
 	expected := SignHMAC(message, secret)
 	return hmac.Equal([]byte(expected), []byte(signature))
+}
+
+var (
+	ErrUnsupportedEncoding = errors.New("unsupported encoding")
+)
+
+const (
+	EncodingHex       = "hex"
+	EncodingBase64URL = "base64url"
+)
+
+// GenerateSecret generates a secure, random string with the given character length. encoding must be hex/base64url.
+func GenerateSecret(prefix string, charLen int, encoding string) (string, error) {
+	var byteLen int
+
+	switch encoding {
+	case EncodingHex:
+		byteLen = int(math.Ceil(float64(charLen) / 2))
+	case EncodingBase64URL:
+		byteLen = int(math.Ceil(float64(charLen) * 3 / 4))
+	default:
+		return "", ErrUnsupportedEncoding
+	}
+
+	b := make([]byte, byteLen)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to read random numbers into buffer: %w", err)
+	}
+
+	var secret string
+	switch encoding {
+	case EncodingHex:
+		secret = hex.EncodeToString(b)
+	case EncodingBase64URL:
+		secret = base64.RawURLEncoding.EncodeToString(b)
+	}
+
+	secret = (prefix + secret)[:charLen]
+	return secret, nil
 }

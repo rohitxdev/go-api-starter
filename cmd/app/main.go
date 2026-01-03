@@ -55,10 +55,18 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed to parse email templates: %w", err)
 	}
-	ec, err := email.New(&email.SMTPCredentials{}, templates)
+
+	smtpCredentials := email.SMTPCredentials{
+		Username: cfg.SMTPUsername,
+		Password: cfg.SMTPPassword,
+		Host:     cfg.SMTPHost,
+		Port:     cfg.SMTPPort,
+	}
+	ec, err := email.New(&smtpCredentials, templates)
 	if err != nil {
 		return fmt.Errorf("failed to initialize email client: %w", err)
 	}
+	logger.Info("initialized email client")
 
 	// Cache
 	cache, err := cache.New[string](time.Hour * 12)

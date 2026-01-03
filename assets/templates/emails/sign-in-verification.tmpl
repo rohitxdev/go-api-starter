@@ -1,0 +1,19 @@
+<div>
+    {{ template "header" . }}
+    <p>Hi, Use the verification code below to sign in.</p>
+    <div style="
+    margin: 24px 0;
+    padding: 16px;
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: 4px;
+    text-align: center;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+  ">
+        {{.code}}
+    </div>
+    <p>This code will expire in {{.ttlMinutes}} minutes.</p>
+    <p>If you didn't request this, please ignore this email.</p>
+    {{ template "footer" . }}
+</div>
