@@ -23,6 +23,15 @@ var (
 	ErrStoreNotInitialized = errors.New("config store not initialized")
 )
 
+type Environment = string
+
+const (
+	EnvTest        Environment = "testing"
+	EnvDevelopment Environment = "development"
+	EnvStaging     Environment = "staging"
+	EnvProduction  Environment = "production"
+)
+
 type Build struct {
 	AppName        string    `json:"app_name" validate:"required"`
 	AppVersion     string    `json:"app_version" validate:"required"`
@@ -31,16 +40,17 @@ type Build struct {
 }
 
 type Runtime struct {
-	AllowedOrigins      []string      `json:"allowed_origins" validate:"required,dive,min=1" env:"ALLOWED_ORIGINS"`
-	AppEnv              Environment   `json:"app_env" validate:"required,oneof=testing development staging production" env:"APP_ENV"`
-	TmpDir              string        `json:"tmp_dir" validate:"required,dir" env:"TMP_DIR"`
-	HTTPHost            string        `json:"http_host" validate:"required" env:"HTTP_HOST"`
-	HTTPPort            string        `json:"http_port" validate:"required" env:"HTTP_PORT"`
-	EmailFromAddress    string        `json:"email_from_address" env:"EMAIL_FROM_ADDRESS"`
-	EmailFromName       string        `json:"email_from_name" env:"EMAIL_FROM_NAME"`
-	SessionTTL          time.Duration `json:"session_ttl" validate:"required" env:"SESSION_TTL"`
-	VerificationCodeTTL time.Duration `json:"verification_code_ttl" validate:"required" env:"VERIFICATION_CODE_TTL"`
-	Debug               bool          `json:"debug" env:"DEBUG"`
+	AllowedOrigins          []string      `json:"allowed_origins" validate:"required,dive,min=1" env:"ALLOWED_ORIGINS"`
+	AppEnv                  Environment   `json:"app_env" validate:"required,oneof=testing development staging production" env:"APP_ENV"`
+	TmpDir                  string        `json:"tmp_dir" validate:"required,dir" env:"TMP_DIR"`
+	HTTPHost                string        `json:"http_host" validate:"required" env:"HTTP_HOST"`
+	HTTPPort                string        `json:"http_port" validate:"required" env:"HTTP_PORT"`
+	EmailFromAddress        string        `json:"email_from_address" env:"EMAIL_FROM_ADDRESS"`
+	EmailFromName           string        `json:"email_from_name" env:"EMAIL_FROM_NAME"`
+	SessionTTL              time.Duration `json:"session_ttl" validate:"required" env:"SESSION_TTL"`
+	VerificationCodeTTL     time.Duration `json:"verification_code_ttl" validate:"required" env:"VERIFICATION_CODE_TTL"`
+	MaxVerificationAttempts int           `json:"max_verification_attempts" validate:"required,min=1" env:"MAX_VERIFICATION_ATTEMPTS"`
+	Debug                   bool          `json:"debug" env:"DEBUG"`
 }
 
 type Secrets struct {

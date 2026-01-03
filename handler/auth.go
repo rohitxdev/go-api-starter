@@ -92,7 +92,8 @@ func (h *Handler) VerifySignIn(c echo.Context) error {
 		return fmt.Errorf("failed to convert 'attempts' to type int: %w", err)
 	}
 
-	if attempts >= 3 {
+	cfg := h.Config.Get()
+	if attempts >= cfg.MaxVerificationAttempts {
 		if err = h.Redis.Del(ctx, key).Err(); err != nil {
 			return fmt.Errorf("failed to delete verification code: %w", err)
 		}
@@ -120,7 +121,7 @@ func (h *Handler) VerifySignIn(c echo.Context) error {
 		return fmt.Errorf("failed to generate session id: %w", err)
 	}
 
-	if err = h.Redis.Set(ctx, "session:"+sessionId, user.ID, h.Config.Get().SessionTTL).Err(); err != nil {
+	if err = h.Redis.Set(ctx, "session:"+sessionId, user.ID, cfg.SessionTTL).Err(); err != nil {
 		return fmt.Errorf("failed to save session to redis: %w", err)
 	}
 

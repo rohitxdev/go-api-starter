@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"github.com/google/uuid"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/redis/go-redis/v9"
@@ -32,17 +31,12 @@ func resolveUserFromSession(c echo.Context, rdb *redis.Client) string {
 		return ""
 	}
 
-	sessIDstr, ok := sess.Values["id"].(string)
+	sessID, ok := sess.Values["id"].(string)
 	if !ok {
 		return ""
 	}
 
-	sessID, err := uuid.Parse(sessIDstr)
-	if err != nil {
-		return ""
-	}
-
-	userID := rdb.Get(c.Request().Context(), "session:"+sessID.String()).String()
+	userID := rdb.Get(c.Request().Context(), "session:"+sessID).String()
 	if userID == "" {
 		return ""
 	}
