@@ -63,7 +63,18 @@ func (h *Handler) SendSignInVerificationCode(c echo.Context) error {
 		return fmt.Errorf("failed to send sign-in verification code email: %w", err)
 	}
 
-	return c.NoContent(http.StatusOK)
+	type payload struct {
+		CodeLength       int    `json:"code_length"`
+		CodeRegexPattern string `json:"code_regex_pattern"`
+	}
+
+	codeLen := len(code)
+	return c.JSON(http.StatusOK, APISuccessResponse{
+		Data: payload{
+			CodeLength:       codeLen,
+			CodeRegexPattern: fmt.Sprintf("^[%s]{%d}$", util.AlphaNumCharset, codeLen),
+		},
+	})
 }
 
 func (h *Handler) VerifySignIn(c echo.Context) error {

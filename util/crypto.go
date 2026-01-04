@@ -236,9 +236,9 @@ func VerifyJWT[T any](tokenStr string, secret string) (T, error) {
 }
 
 // Exclude similar looking characters like 0, O, I, 1, l
-const alphaNumCharset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+const AlphaNumCharset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
-var alphaNumCharsetSize = big.NewInt(int64(len(alphaNumCharset)))
+var alphaNumCharsetSize = big.NewInt(int64(len(AlphaNumCharset)))
 
 func GenerateAlphaNumCode(size int) (string, error) {
 	if size < 0 {
@@ -253,7 +253,7 @@ func GenerateAlphaNumCode(size int) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to create random integer: %w", err)
 		}
-		code.WriteByte(alphaNumCharset[n.Int64()])
+		code.WriteByte(AlphaNumCharset[n.Int64()])
 	}
 
 	return code.String(), nil
