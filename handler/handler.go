@@ -66,7 +66,7 @@ func registerV1Routes(e *echo.Echo, h *Handler) {
 			signIn := auth.Group("/sign-in")
 			{
 				signIn.POST("/send-code", h.SendSignInVerificationCode)
-				signIn.POST("/verify-code", h.VerifySignIn)
+				signIn.POST("/verify-code", h.VerifySignIn, middleware.RateLimit(h.RateLimiter, redis_rate.PerMinute(2)))
 			}
 			auth.POST("/sign-out", h.SignOut)
 		}

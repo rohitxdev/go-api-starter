@@ -1,8 +1,6 @@
 package util
 
 import (
-	"runtime/debug"
-
 	"github.com/go-playground/validator"
 )
 
@@ -16,17 +14,6 @@ func Coalesce[T comparable](values ...T) T {
 		}
 	}
 	return zero
-}
-
-func CapturePanic[T any](fn func() T) (res T, panicVal any, stack []byte) {
-	defer func() {
-		if r := recover(); r != nil {
-			panicVal = r
-			stack = debug.Stack()
-		}
-	}()
-	res = fn()
-	return
 }
 
 func Must[T any](fn func() (T, error)) T {
